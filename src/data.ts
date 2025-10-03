@@ -16,7 +16,7 @@ export const SAMPLES: Record<SampleCategory, Sample[]> = {
   melody: [
     { id: 'm1', name: 'Piano Loop (8 measures)', url: 'https://files.catbox.moe/k5k03s.wav', duration: 4, color: '#ff006e' },
     { id: 'm3', name: 'Freedom Chord', url: '/melodies/OS_VC2_90_songstarter_freedom_Fm.wav', duration: 4, color: '#e01e5a' },
-    { id: 'm4', name: 'Vintage Ochre (G#)', url: '/melodies/AHA_LS_90_vintage_piano_loop_ochre_G#.wav', duration: 4, color: '#d90429' },
+    { id: 'm4', name: 'Vintage Ochre', url: '/melodies/AHA_LS_90_vintage_piano_loop_ochre.wav', duration: 4, color: '#d90429' },
     { id: 'm5', name: 'Fading EP (Abm)', url: '/melodies/DBM_SDRNB_FADING_electric_piano_90BPM_Ab-MINOR.wav', duration: 4, color: '#ef233c' },
     { id: 'm6', name: 'Classy Piano (Cm)', url: '/melodies/OS_SS_90_songstarter_piano_classy_Cm.wav', duration: 4, color: '#d90429' },
     { id: 'm7', name: 'Piano Romance (Gmaj)', url: '/melodies/TC_RB_90_piano_romance_Gmaj.wav', duration: 4, color: '#ef233c' },
