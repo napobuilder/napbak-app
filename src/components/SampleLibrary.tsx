@@ -26,7 +26,7 @@ const SampleItem: React.FC<SampleItemProps> = ({ sample, category }) => {
 };
 
 export const SampleLibrary: React.FC = () => (
-  <div className="h-full flex flex-col bg-[#181818] rounded-t-2xl p-4 box-border">
+  <div className="h-full flex flex-col bg-[#181818] rounded-2xl p-4 box-border">
     <p className="text-white text-lg font-bold mb-2">Sample Library</p>
     <div className="overflow-x-auto w-full flex-1">
       <div className="flex flex-row">

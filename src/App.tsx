@@ -76,44 +76,48 @@ const App = () => {
   const visibleDuration = NUM_SLOTS * (60 / BPM) * 4;
 
   return (
-    <div className="min-h-screen bg-[#121212] font-sans text-white p-6">
-      <div className="flex flex-col h-full">
-        <header className="flex justify-between items-center border-b border-[#282828] pb-4">
-          <img src="/napbak app.png" alt="Napbak Logo" className="h-10 w-auto" />
-          <p className="text-[#b3b3b3] text-lg m-0">BPM: {BPM}</p>
-        </header>
+    <div className="min-h-screen bg-[#121212] font-sans text-white p-6 flex flex-col">
+      <header className="flex justify-between items-center border-b border-[#282828] pb-4 flex-shrink-0">
+        <img src="/napbak app.png" alt="Napbak Logo" className="h-10 w-auto" />
+        <p className="text-[#b3b3b3] text-lg m-0">BPM: {BPM}</p>
+      </header>
 
-        <main className="relative flex-2 flex flex-col justify-around py-4">
-          <Playhead 
-            isPlaying={isPlaying}
-            playbackTime={playbackTime}
-            totalDuration={visibleDuration} // Usamos la duración visible, no la total de la canción
-          />
-          {TRACK_TYPES.map(type => (
-            <Track
-              key={type}
-              type={type}
-              volume={volumes[type as TrackType]}
-              slots={trackSlots[type as TrackType]}
-              onDrop={handleDrop}
-              onClear={handleClear}
-            />
-          ))}
-        </main>
-
-        <div className="border-t border-[#282828] pt-4">
-          <PlaybackTracker currentTime={playbackTime} totalDuration={totalDuration} />
-          <PlaybackControls
-            isPlaying={isPlaying}
-            isExporting={isExporting}
-            onPlayPause={handlePlayPause}
-            onExport={handleExport}
-          />
+      <div className="flex flex-row flex-1 gap-6 pt-6">
+        {/* Left Panel: Sample Library */}
+        <div className="w-1/4 flex-shrink-0">
+          <SampleLibrary />
         </div>
 
-        <footer className="flex-grow min-h-[150px]">
-          <SampleLibrary />
-        </footer>
+        {/* Right Panel: Main Content */}
+        <div className="flex-1 flex flex-col">
+          <main className="relative flex-1 flex flex-col justify-around">
+            <Playhead 
+              isPlaying={isPlaying}
+              playbackTime={playbackTime}
+              totalDuration={visibleDuration} // Usamos la duración visible, no la total de la canción
+            />
+            {TRACK_TYPES.map(type => (
+              <Track
+                key={type}
+                type={type}
+                volume={volumes[type as TrackType]}
+                slots={trackSlots[type as TrackType]}
+                onDrop={handleDrop}
+                onClear={handleClear}
+              />
+            ))}
+          </main>
+
+          <div className="border-t border-[#282828] pt-4">
+            <PlaybackTracker currentTime={playbackTime} totalDuration={totalDuration} />
+            <PlaybackControls
+              isPlaying={isPlaying}
+              isExporting={isExporting}
+              onPlayPause={handlePlayPause}
+              onExport={handleExport}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
