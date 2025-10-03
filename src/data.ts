@@ -11,17 +11,18 @@ export const SAMPLES: Record<SampleCategory, Sample[]> = {
     { id: 'd6', name: 'Pomeranian', url: '/drums/SO_SL_90_top_loop_acoustic_pomeranian.wav', duration: 1, color: '#fb5607' },
   ],
   bass: [
-    { id: 'b1', name: 'Sub Bass', url: 'https://files.catbox.moe/s4i18l.wav', duration: 1, color: '#3a86ff' },
-    { id: 'b2', name: 'Reese Bass', url: 'https://files.catbox.moe/9v22ou.wav', duration: 1, color: '#3a86ff' },
     { id: 'b3', name: 'Analog Sub', url: 'https://files.catbox.moe/xc7446.wav', duration: 1, color: '#3a86ff' },
   ],
   melody: [
     { id: 'm1', name: 'Piano Loop (8 measures)', url: 'https://files.catbox.moe/k5k03s.wav', duration: 4, color: '#ff006e' },
-    { id: 'm2', name: 'Synth Arp', url: 'https://files.catbox.moe/19w4wv.wav', duration: 1, color: '#f72585' },
     { id: 'm3', name: 'Freedom Chord', url: '/melodies/OS_VC2_90_songstarter_freedom_Fm.wav', duration: 4, color: '#e01e5a' },
+    { id: 'm4', name: 'Vintage Ochre (G#)', url: '/melodies/AHA_LS_90_vintage_piano_loop_ochre_G#.wav', duration: 4, color: '#d90429' },
+    { id: 'm5', name: 'Fading EP (Abm)', url: '/melodies/DBM_SDRNB_FADING_electric_piano_90BPM_Ab-MINOR.wav', duration: 4, color: '#ef233c' },
+    { id: 'm6', name: 'Classy Piano (Cm)', url: '/melodies/OS_SS_90_songstarter_piano_classy_Cm.wav', duration: 4, color: '#d90429' },
+    { id: 'm7', name: 'Piano Romance (Gmaj)', url: '/melodies/TC_RB_90_piano_romance_Gmaj.wav', duration: 4, color: '#ef233c' },
   ],
   fills: [
-    { id: 'f1', name: 'Beatdown', url: '/fills/BEATDOWNS_drum_fill_029_90.wav', duration: 1, color: '#8338ec' },
+    { id: 'f1', name: 'Beatdown', url: '/fills/BEATDOWNS_drum_fill_029_90.wav', duration: 1, color: '#8338ec', offset: 0.445 },
   ],
   sfx: [
     { id: 's1', name: 'Scratch', url: '/sfx/cd_fx90_scratchness.wav', duration: 1, color: '#8338ec' },

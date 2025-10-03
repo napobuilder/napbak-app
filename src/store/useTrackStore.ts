@@ -1,22 +1,44 @@
 import { create } from 'zustand';
 import type { Sample, TrackType } from '../types';
+import { useAudioEngine } from './useAudioEngine'; // Importar el motor de audio
 
 const TRACK_TYPES: TrackType[] = ['Drums', 'Bass', 'Melody', 'Fills', 'SFX'];
 const NUM_SLOTS = 8;
 
 interface TrackState {
   trackSlots: Record<TrackType, (Sample | null)[]>;
+  volumes: Record<TrackType, number>;
   totalDuration: number;
   handleDrop: (trackType: TrackType, slotIndex: number, sample: Sample) => void;
   handleClear: (trackType: TrackType, instanceId: string) => void;
   setTotalDuration: (duration: number) => void;
+  setVolume: (trackType: TrackType, volume: number) => void;
 }
 
 export const useTrackStore = create<TrackState>((set, get) => ({
   trackSlots: Object.fromEntries(TRACK_TYPES.map(type => [type, Array(NUM_SLOTS).fill(null)])) as Record<TrackType, (Sample | null)[]>,
+  volumes: {
+    Drums: 1.0,
+    Bass: 1.0,
+    Melody: 1.0,
+    Fills: 1.0,
+    SFX: 1.0,
+  },
   totalDuration: 0,
 
   setTotalDuration: (duration) => set({ totalDuration: duration }),
+
+  setVolume: (trackType, volume) => {
+    // Actualizar el estado local para la UI y persistencia
+    set(state => ({
+      volumes: {
+        ...state.volumes,
+        [trackType]: volume,
+      },
+    }));
+    // Llamar al motor de audio para el cambio en tiempo real
+    useAudioEngine.getState().setTrackVolume(trackType, volume);
+  },
 
   handleDrop: (trackType, slotIndex, sample) => {
     const duration = sample.duration || 1;

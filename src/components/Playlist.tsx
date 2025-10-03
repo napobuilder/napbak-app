@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import type { Sample, TrackType } from '../types';
+import VolumeKnob from './VolumeKnob'; // Importamos el Knob
 
 const NUM_SLOTS = 8; 
 
@@ -58,11 +59,12 @@ interface TrackProps {
     type: TrackType;
     volume: number;
     slots: (Sample | null)[];
+    setVolume: (trackType: TrackType, volume: number) => void;
     onDrop: (trackType: TrackType, slotIndex: number, sample: Sample) => void;
     onClear: (trackType: TrackType, instanceId: string) => void;
 }
 
-export const Track: React.FC<TrackProps> = ({ type, volume, slots, onDrop, onClear }) => {
+export const Track: React.FC<TrackProps> = ({ type, volume, slots, setVolume, onDrop, onClear }) => {
     // Renderiza los samples que existen en los slots
     const renderedSamples = [];
     let i = 0;
@@ -97,9 +99,15 @@ export const Track: React.FC<TrackProps> = ({ type, volume, slots, onDrop, onCle
     
     return (
         <div className="bg-[#1E1E1E] mb-2.5 rounded-lg p-2.5 flex flex-col">
-            <div className="flex justify-between mb-2.5">
-                <p className="text-white font-bold m-0">{type}</p>
-                <p className="text-white font-bold m-0">Vol: {Math.round(volume * 100)}%</p>
+            <div className="flex justify-between items-center mb-2.5">
+                <p className="text-white font-bold m-0 w-1/4">{type}</p>
+                <div className="flex items-center justify-end w-3/4 gap-4">
+                    <VolumeKnob 
+                        volume={volume} 
+                        onChange={(newVolume) => setVolume(type, newVolume)} 
+                    />
+                    <span className="text-sm text-gray-400 w-12 text-center">{`${Math.round(volume * 100)}%`}</span>
+                </div>
             </div>
             <div className="grid grid-cols-8 gap-2.5 w-full min-h-[60px] relative">
                 {/* Capa de fondo para dropear */}

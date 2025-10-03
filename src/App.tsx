@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useTrackStore } from './store/useTrackStore';
 import { useAudioEngine } from './store/useAudioEngine';
+import { useUIStore } from './store/useUIStore'; // Importar UI Store
 import type { Sample, TrackType } from './types';
 
 import { SampleLibrary } from './components/SampleLibrary';
 import { Track } from './components/Playlist';
 import { PlaybackTracker } from './components/PlaybackTracker';
 import { PlaybackControls } from './components/PlaybackControls';
+import { FileNameModal } from './components/FileNameModal'; // Importar Modal
 
 const TRACK_TYPES: TrackType[] = ['Drums', 'Bass', 'Melody', 'Fills', 'SFX'];
 const NUM_SLOTS = 8;
@@ -38,13 +40,19 @@ const App = () => {
   const {
     trackSlots,
     totalDuration,
+    volumes,
+    setVolume,
     handleDrop: handleDropInStore,
     handleClear,
     setTotalDuration,
   } = useTrackStore();
 
-  const { isPlaying, playbackTime, isExporting, loadAudioBuffer, handlePlayPause, handleExport } = useAudioEngine();
-  const [volumes, ] = useState({ Drums: 1.0, Bass: 1.0, Melody: 1.0, Fills: 1.0, SFX: 1.0 })
+  const { init, isPlaying, playbackTime, isExporting, loadAudioBuffer, handlePlayPause, handleExport } = useAudioEngine();
+  const { isFileNameModalOpen, closeFileNameModal, onFileNameSubmit } = useUIStore();
+
+  useEffect(() => {
+    init();
+  }, [init]);
 
   useEffect(() => {
     const measureDuration = (60 / BPM) * 4;
@@ -84,7 +92,7 @@ const App = () => {
 
       <div className="flex flex-row flex-1 gap-6 pt-6">
         {/* Left Panel: Sample Library */}
-        <div className="w-1/4 flex-shrink-0">
+        <div className="w-80 flex-shrink-0">
           <SampleLibrary />
         </div>
 
@@ -101,6 +109,7 @@ const App = () => {
                 key={type}
                 type={type}
                 volume={volumes[type as TrackType]}
+                setVolume={setVolume}
                 slots={trackSlots[type as TrackType]}
                 onDrop={handleDrop}
                 onClear={handleClear}
@@ -119,12 +128,19 @@ const App = () => {
           </div>
         </div>
       </div>
+      
+      <FileNameModal 
+        isOpen={isFileNameModalOpen}
+        onClose={closeFileNameModal}
+        onSubmit={(fileName) => {
+          if (onFileNameSubmit) {
+            onFileNameSubmit(fileName);
+          }
+          closeFileNameModal();
+        }}
+      />
     </div>
   );
 };
 
 export default App;
-
-
-
-

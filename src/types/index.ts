@@ -4,6 +4,7 @@ export interface Sample {
   url: string;
   duration: number;
   color: string;
+  offset?: number;
   instanceId?: string;
 }
 
