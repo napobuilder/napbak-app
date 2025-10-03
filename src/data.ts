@@ -18,6 +18,7 @@ export const SAMPLES: Record<SampleCategory, Sample[]> = {
   melody: [
     { id: 'm1', name: 'Piano Loop (8 measures)', url: 'https://files.catbox.moe/k5k03s.wav', duration: 4, color: '#ff006e' },
     { id: 'm2', name: 'Synth Arp', url: 'https://files.catbox.moe/19w4wv.wav', duration: 1, color: '#f72585' },
+    { id: 'm3', name: 'Freedom Chord', url: '/OS_VC2_90_songstarter_freedom_Fm.wav', duration: 4, color: '#e01e5a' },
   ],
   fills: [
     { id: 'f1', name: 'Beatdown', url: '/fills/BEATDOWNS_drum_fill_029_90.wav', duration: 1, color: '#8338ec' },

@@ -12,6 +12,28 @@ const TRACK_TYPES: TrackType[] = ['Drums', 'Bass', 'Melody', 'Fills', 'SFX'];
 const NUM_SLOTS = 8;
 const BPM = 90;
 
+// --- Componente del Cabezal de Reproducción ---
+interface PlayheadProps {
+  isPlaying: boolean;
+  playbackTime: number;
+  totalDuration: number;
+}
+
+const Playhead: React.FC<PlayheadProps> = ({ isPlaying, playbackTime, totalDuration }) => {
+  if (!isPlaying || totalDuration === 0) {
+    return null;
+  }
+
+  const progress = (playbackTime / totalDuration) * 100;
+
+  return (
+    <div 
+      className="absolute top-0 w-0.5 h-full bg-[#1DB954] z-20"
+      style={{ left: `${progress}%` }}
+    />
+  );
+};
+
 const App = () => {
   const {
     trackSlots,
@@ -50,6 +72,9 @@ const App = () => {
     handleDropInStore(trackType, slotIndex, sample);
   };
 
+  // La duración de la vista actual de la playlist (siempre 8 slots)
+  const visibleDuration = NUM_SLOTS * (60 / BPM) * 4;
+
   return (
     <div className="flex flex-col h-screen bg-[#121212] font-sans">
       <header className="p-3.75 flex justify-between items-center border-b border-[#282828]">
@@ -57,7 +82,12 @@ const App = () => {
         <p className="text-[#b3b3b3] text-lg m-0">BPM: {BPM}</p>
       </header>
 
-      <main className="flex-2 p-2.5 flex flex-col justify-around">
+      <main className="relative flex-2 py-2.5 px-3.75 flex flex-col justify-around">
+        <Playhead 
+          isPlaying={isPlaying}
+          playbackTime={playbackTime}
+          totalDuration={visibleDuration} // Usamos la duración visible, no la total de la canción
+        />
         {TRACK_TYPES.map(type => (
           <Track
             key={type}
