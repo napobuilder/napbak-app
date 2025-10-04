@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import type { Sample, TrackType } from '../types';
 import VolumeKnob from './VolumeKnob'; // Importamos el Knob
 
-const NUM_SLOTS = 8; 
+ 
 
 // --- Componentes de la UI ---
 
@@ -59,16 +59,17 @@ interface TrackProps {
     type: TrackType;
     volume: number;
     slots: (Sample | null)[];
+    numSlots: number;
     setVolume: (trackType: TrackType, volume: number) => void;
     onDrop: (trackType: TrackType, slotIndex: number, sample: Sample) => void;
     onClear: (trackType: TrackType, instanceId: string) => void;
 }
 
-export const Track: React.FC<TrackProps> = ({ type, volume, slots, setVolume, onDrop, onClear }) => {
+export const Track: React.FC<TrackProps> = ({ type, volume, slots, numSlots, setVolume, onDrop, onClear }) => {
     // Renderiza los samples que existen en los slots
     const renderedSamples = [];
     let i = 0;
-    while (i < NUM_SLOTS) {
+    while (i < numSlots) {
         const sample = slots[i];
         if (sample) {
             const duration = sample.duration || 1;
@@ -90,13 +91,15 @@ export const Track: React.FC<TrackProps> = ({ type, volume, slots, setVolume, on
     }
 
     // Renderiza una rejilla de fondo con zonas para dropear
-    const dropGrid = Array.from({ length: NUM_SLOTS }).map((_, index) => (
+    const dropGrid = Array.from({ length: numSlots }).map((_, index) => (
         <EmptySlot 
             key={index} 
             onDrop={(droppedSample) => onDrop(type, index, droppedSample)} 
         />
     ));
     
+    const gridStyle = { gridTemplateColumns: `repeat(${numSlots}, 1fr)` };
+
     return (
         <div className="bg-[#1E1E1E] mb-2.5 rounded-lg p-2.5 flex flex-col">
             <div className="flex justify-between items-center mb-2.5">
@@ -109,13 +112,13 @@ export const Track: React.FC<TrackProps> = ({ type, volume, slots, setVolume, on
                     <span className="text-sm text-gray-400 w-12 text-center">{`${Math.round(volume * 100)}%`}</span>
                 </div>
             </div>
-            <div className="grid grid-cols-8 gap-2.5 w-full min-h-[60px] relative">
+            <div className="grid gap-2.5 w-full min-h-[60px] relative" style={gridStyle}>
                 {/* Capa de fondo para dropear */}
-                <div className="absolute inset-0 grid grid-cols-8 gap-2.5 w-full h-full">
+                <div className="absolute inset-0 grid gap-2.5 w-full h-full" style={gridStyle}>
                     {dropGrid}
                 </div>
                 {/* Capa de encima con los samples */}
-                <div className="absolute inset-0 grid grid-cols-8 gap-2.5 w-full h-full pointer-events-none">
+                <div className="absolute inset-0 grid gap-2.5 w-full h-full pointer-events-none" style={gridStyle}>
                     {renderedSamples.map(sampleElement => 
                         React.cloneElement(sampleElement, { 
                             ...sampleElement.props,

@@ -9,9 +9,10 @@ import { Track } from './components/Playlist';
 import { PlaybackTracker } from './components/PlaybackTracker';
 import { PlaybackControls } from './components/PlaybackControls';
 import { FileNameModal } from './components/FileNameModal'; // Importar Modal
+import { AddBarsButton } from './components/AddBarsButton'; // Importar nuevo botón
 
 const TRACK_TYPES: TrackType[] = ['Drums', 'Bass', 'Melody', 'Fills', 'SFX'];
-const NUM_SLOTS = 8;
+
 const BPM = 90;
 
 // --- Componente del Cabezal de Reproducción ---
@@ -41,6 +42,8 @@ const App = () => {
     trackSlots,
     totalDuration,
     volumes,
+    numSlots, // Leer numSlots desde el store
+    addSlots, // Obtener la acción addSlots
     setVolume,
     handleDrop: handleDropInStore,
     handleClear,
@@ -71,17 +74,17 @@ const App = () => {
       }
     }
 
-    const newTotalDuration = (maxEndSlot > 0 ? maxEndSlot : NUM_SLOTS) * measureDuration;
+    const newTotalDuration = (maxEndSlot > 0 ? maxEndSlot : numSlots) * measureDuration;
     setTotalDuration(newTotalDuration);
-  }, [trackSlots, setTotalDuration]);
+  }, [trackSlots, numSlots, setTotalDuration]);
 
   const handleDrop = (trackType: TrackType, slotIndex: number, sample: Sample) => {
     loadAudioBuffer(sample.url);
     handleDropInStore(trackType, slotIndex, sample);
   };
 
-  // La duración de la vista actual de la playlist (siempre 8 slots)
-  const visibleDuration = NUM_SLOTS * (60 / BPM) * 4;
+  // La duración de la vista actual de la playlist
+  const visibleDuration = numSlots * (60 / BPM) * 4;
 
   return (
     <div className="min-h-screen bg-[#121212] font-sans text-white p-6 flex flex-col">
@@ -98,24 +101,28 @@ const App = () => {
 
         {/* Right Panel: Main Content */}
         <div className="flex-1 flex flex-col">
-          <main className="relative flex-1 flex flex-col justify-around">
-            <Playhead 
-              isPlaying={isPlaying}
-              playbackTime={playbackTime}
-              totalDuration={visibleDuration} // Usamos la duración visible, no la total de la canción
-            />
-            {TRACK_TYPES.map(type => (
-              <Track
-                key={type}
-                type={type}
-                volume={volumes[type as TrackType]}
-                setVolume={setVolume}
-                slots={trackSlots[type as TrackType]}
-                onDrop={handleDrop}
-                onClear={handleClear}
+          <div className="flex flex-1 items-center gap-4">
+            <main className="relative flex-1 flex flex-col justify-around">
+              <Playhead 
+                isPlaying={isPlaying}
+                playbackTime={playbackTime}
+                totalDuration={visibleDuration} // Usamos la duración visible, no la total de la canción
               />
-            ))}
-          </main>
+              {TRACK_TYPES.map(type => (
+                <Track
+                  key={type}
+                  type={type}
+                  volume={volumes[type as TrackType]}
+                  setVolume={setVolume}
+                  slots={trackSlots[type as TrackType]}
+                  numSlots={numSlots}
+                  onDrop={handleDrop}
+                  onClear={handleClear}
+                />
+              ))}
+            </main>
+            <AddBarsButton onClick={() => addSlots(8)} />
+          </div>
 
           <div className="border-t border-[#282828] pt-4">
             <PlaybackTracker currentTime={playbackTime} totalDuration={totalDuration} />

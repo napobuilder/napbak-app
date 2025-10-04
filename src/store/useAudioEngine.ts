@@ -4,7 +4,7 @@ import { useUIStore } from './useUIStore';
 import type { Sample, TrackType } from '../types';
 
 const TRACK_TYPES: TrackType[] = ['Drums', 'Bass', 'Melody', 'Fills', 'SFX'];
-const NUM_SLOTS = 8;
+
 const BPM = 90;
 
 let audioContext: AudioContext;
@@ -113,7 +113,7 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => ({
     const audioContext = getAudioContext();
     if (audioContext.state === 'suspended') await audioContext.resume();
 
-    const { trackSlots, totalDuration } = useTrackStore.getState();
+    const { trackSlots, totalDuration, numSlots } = useTrackStore.getState();
 
     const stopPlayback = () => {
       playingSources.forEach(source => { try { source.stop(); } catch {} });
@@ -137,7 +137,7 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => ({
       if (!trackGainNode) continue;
 
       let i = 0;
-      while (i < NUM_SLOTS) {
+      while (i < numSlots) {
         const sample = trackSlots[trackType as TrackType][i];
         if (sample) {
           const audioBuffer = await get().loadAudioBuffer(sample.url);
@@ -175,7 +175,7 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => ({
     showFileNameModal(async (fileName) => {
       set({ isExporting: true });
       try {
-        const { trackSlots, totalDuration, volumes } = useTrackStore.getState();
+        const { trackSlots, totalDuration, volumes, numSlots } = useTrackStore.getState();
         const audioContext = getAudioContext();
         let finalFileName = fileName;
         if (!finalFileName) finalFileName = "napbak-beat.wav";
@@ -186,7 +186,7 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => ({
 
         for (const trackType of TRACK_TYPES) {
           let i = 0;
-          while (i < NUM_SLOTS) {
+          while (i < numSlots) {
             const sample = trackSlots[trackType as TrackType][i];
             if (sample) {
               const audioBuffer = await get().loadAudioBuffer(sample.url);
