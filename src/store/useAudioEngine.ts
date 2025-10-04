@@ -36,101 +36,16 @@ let playingSources: AudioBufferSourceNode[] = [];
 let animationFrameId: number | null = null;
 let playbackStartTime = 0;
 
-export const useAudioEngine = create<AudioEngineState>((set, get) => ({
-  isInitialized: false,
-  isPlaying: false,
-  playbackTime: 0,
-  isExporting: false,
-  previewSource: null,
-  previewUrl: null,
-  trackGainNodes: {},
+export const useAudioEngine = create<AudioEngineState>((set, get) => {
+  const schedulePlayback = () => {
+    // Detener todas las fuentes previamente programadas para limpiar la línea de tiempo
+    playingSources.forEach(source => { try { source.stop(); } catch {} });
 
-  init: () => {
-    if (get().isInitialized) return;
-    const audioContext = getAudioContext();
-    const gainNodes: { [key: string]: GainNode } = {};
-    const initialVolumes = useTrackStore.getState().volumes;
-    for (const type of TRACK_TYPES) {
-      const gainNode = audioContext.createGain();
-      gainNode.gain.value = initialVolumes[type];
-      gainNode.connect(audioContext.destination);
-      gainNodes[type] = gainNode;
-    }
-    set({ trackGainNodes: gainNodes, isInitialized: true });
-  },
-
-  setTrackVolume: (trackType, volume) => {
-    const gainNode = get().trackGainNodes[trackType];
-    if (gainNode) {
-      gainNode.gain.setTargetAtTime(volume, getAudioContext().currentTime, 0.01);
-    }
-  },
-
-  loadAudioBuffer: async (url) => {
-    if (audioBuffers[url]) return audioBuffers[url];
-    try {
-      const response = await fetch(url);
-      const arrayBuffer = await response.arrayBuffer();
-      const audioContext = getAudioContext();
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-      audioBuffers[url] = audioBuffer;
-      return audioBuffer;
-    } catch (error) {
-      console.error(`Error loading audio from ${url}:`, error);
-      return null;
-    }
-  },
-
-  previewSample: async (url) => {
-    const audioContext = getAudioContext();
-    if (audioContext.state === 'suspended') await audioContext.resume();
-
-    if (get().previewUrl === url) {
-      get().previewSource?.stop();
-      set({ previewSource: null, previewUrl: null });
-      return;
-    }
-
-    if (get().previewSource) get().previewSource?.stop();
-    set({ previewSource: null, previewUrl: null });
-
-    const audioBuffer = await get().loadAudioBuffer(url);
-    if (audioBuffer) {
-      const source = audioContext.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(audioContext.destination);
-      source.start(0);
-      set({ previewSource: source, previewUrl: url });
-      source.onended = () => {
-        if (get().previewSource === source) {
-          set({ previewSource: null, previewUrl: null });
-        }
-      };
-    }
-  },
-
-  handlePlayPause: async () => {
-    const audioContext = getAudioContext();
-    if (audioContext.state === 'suspended') await audioContext.resume();
-
-    const { trackSlots, totalDuration, numSlots } = useTrackStore.getState();
-
-    const stopPlayback = () => {
-      playingSources.forEach(source => { try { source.stop(); } catch {} });
-      playingSources = [];
-      if (animationFrameId) cancelAnimationFrame(animationFrameId);
-      set({ isPlaying: false, playbackTime: 0 });
-    };
-
-    if (get().isPlaying) {
-      stopPlayback();
-      return;
-    }
-
-    set({ isPlaying: true });
-    playbackStartTime = audioContext.currentTime;
-    const sourcesToPlay: AudioBufferSourceNode[] = [];
+    const { trackSlots, numSlots } = useTrackStore.getState();
+    const newSources: AudioBufferSourceNode[] = [];
     const measureDuration = (60 / BPM) * 4;
+    const currentTime = getAudioContext().currentTime;
+    const elapsedTime = currentTime - playbackStartTime;
 
     for (const trackType of TRACK_TYPES) {
       const trackGainNode = get().trackGainNodes[trackType];
@@ -140,15 +55,32 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => ({
       while (i < numSlots) {
         const sample = trackSlots[trackType as TrackType][i];
         if (sample) {
-          const audioBuffer = await get().loadAudioBuffer(sample.url);
+          const audioBuffer = audioBuffers[sample.url];
           if (audioBuffer) {
-            const source = audioContext.createBufferSource();
-            source.buffer = audioBuffer;
-            source.connect(trackGainNode);
-            const scheduledTime = playbackStartTime + (i + (sample.offset || 0)) * measureDuration;
-            const samplePlayDuration = (sample.duration || 1) * measureDuration;
-            source.start(scheduledTime, 0, samplePlayDuration);
-            sourcesToPlay.push(source);
+            const sampleDurationInSeconds = (sample.duration || 1) * measureDuration;
+            const sampleStartTimeInSeconds = (i + (sample.offset || 0)) * measureDuration;
+            const sampleEndTimeInSeconds = sampleStartTimeInSeconds + sampleDurationInSeconds;
+
+            // Caso 1: El sample está completamente en el futuro
+            if (sampleStartTimeInSeconds >= elapsedTime) {
+              const source = audioContext.createBufferSource();
+              source.buffer = audioBuffer;
+              source.connect(trackGainNode);
+              source.start(playbackStartTime + sampleStartTimeInSeconds, 0, sampleDurationInSeconds);
+              newSources.push(source);
+            } 
+            // Caso 2: El sample debería estar sonando ahora mismo
+            else if (sampleEndTimeInSeconds > elapsedTime) {
+              const offset = elapsedTime - sampleStartTimeInSeconds;
+              const remainingDuration = sampleDurationInSeconds - offset;
+              const source = audioContext.createBufferSource();
+              source.buffer = audioBuffer;
+              source.connect(trackGainNode);
+              // Empezar inmediatamente desde el offset calculado y por la duración restante
+              source.start(currentTime, offset, remainingDuration);
+              newSources.push(source);
+            }
+            // Caso 3: El sample está completamente en el pasado (no hacer nada)
           }
           i += sample.duration || 1;
         } else {
@@ -156,92 +88,199 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => ({
         }
       }
     }
-    playingSources = sourcesToPlay;
+    playingSources = newSources;
+  };
 
-    const updateProgress = () => {
-      const elapsedTime = audioContext.currentTime - playbackStartTime;
-      if (elapsedTime >= totalDuration) {
-        stopPlayback();
-      } else {
-        set({ playbackTime: elapsedTime });
-        animationFrameId = requestAnimationFrame(updateProgress);
+  const store = {
+    isInitialized: false,
+    isPlaying: false,
+    playbackTime: 0,
+    isExporting: false,
+    previewSource: null,
+    previewUrl: null,
+    trackGainNodes: {},
+
+    init: () => {
+      if (get().isInitialized) return;
+      const audioContext = getAudioContext();
+      const gainNodes: { [key: string]: GainNode } = {};
+      const initialVolumes = useTrackStore.getState().volumes;
+      for (const type of TRACK_TYPES) {
+        const gainNode = audioContext.createGain();
+        gainNode.gain.value = initialVolumes[type];
+        gainNode.connect(audioContext.destination);
+        gainNodes[type] = gainNode;
       }
-    };
-    animationFrameId = requestAnimationFrame(updateProgress);
-  },
+      set({ trackGainNodes: gainNodes, isInitialized: true });
 
-  handleExport: () => {
-    const { showFileNameModal } = useUIStore.getState();
-    showFileNameModal(async (fileName) => {
-      set({ isExporting: true });
+      // Suscribirse a los cambios del track store para la edición en vivo
+      useTrackStore.subscribe((state, prevState) => {
+        if (get().isPlaying && state.trackSlots !== prevState.trackSlots) {
+          schedulePlayback();
+        }
+      });
+    },
+
+    setTrackVolume: (trackType, volume) => {
+      const gainNode = get().trackGainNodes[trackType];
+      if (gainNode) {
+        gainNode.gain.setTargetAtTime(volume, getAudioContext().currentTime, 0.01);
+      }
+    },
+
+    loadAudioBuffer: async (url) => {
+      if (audioBuffers[url]) return audioBuffers[url];
       try {
-        const { trackSlots, totalDuration, volumes, numSlots } = useTrackStore.getState();
+        const response = await fetch(url);
+        const arrayBuffer = await response.arrayBuffer();
         const audioContext = getAudioContext();
-        let finalFileName = fileName;
-        if (!finalFileName) finalFileName = "napbak-beat.wav";
-        if (!finalFileName.toLowerCase().endsWith('.wav')) finalFileName += '.wav';
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        audioBuffers[url] = audioBuffer;
+        return audioBuffer;
+      } catch (error) {
+        console.error(`Error loading audio from ${url}:`, error);
+        return null;
+      }
+    },
 
-        const offlineCtx = new OfflineAudioContext(2, audioContext.sampleRate * totalDuration, audioContext.sampleRate);
-        const measureDuration = (60 / BPM) * 4;
+    previewSample: async (url) => {
+      const audioContext = getAudioContext();
+      if (audioContext.state === 'suspended') await audioContext.resume();
 
-        for (const trackType of TRACK_TYPES) {
-          let i = 0;
-          while (i < numSlots) {
-            const sample = trackSlots[trackType as TrackType][i];
-            if (sample) {
-              const audioBuffer = await get().loadAudioBuffer(sample.url);
-              if (audioBuffer) {
-                const source = offlineCtx.createBufferSource();
-                source.buffer = audioBuffer;
-                const gainNode = offlineCtx.createGain();
-                gainNode.gain.value = volumes[trackType as TrackType];
-                source.connect(gainNode).connect(offlineCtx.destination);
-                const scheduledTime = (i + (sample.offset || 0)) * measureDuration;
-                const samplePlayDuration = (sample.duration || 1) * measureDuration;
-                source.start(scheduledTime, 0, samplePlayDuration);
+      if (get().previewUrl === url) {
+        get().previewSource?.stop();
+        set({ previewSource: null, previewUrl: null });
+        return;
+      }
+
+      if (get().previewSource) get().previewSource?.stop();
+      set({ previewSource: null, previewUrl: null });
+
+      const audioBuffer = await get().loadAudioBuffer(url);
+      if (audioBuffer) {
+        const source = audioContext.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioContext.destination);
+        source.start(0);
+        set({ previewSource: source, previewUrl: url });
+        source.onended = () => {
+          if (get().previewSource === source) {
+            set({ previewSource: null, previewUrl: null });
+          }
+        };
+      }
+    },
+
+    handlePlayPause: async () => {
+      const audioContext = getAudioContext();
+      if (audioContext.state === 'suspended') await audioContext.resume();
+
+      const stopPlayback = () => {
+        playingSources.forEach(source => { try { source.stop(); } catch {} });
+        playingSources = [];
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
+        set({ isPlaying: false, playbackTime: 0 });
+      };
+
+      if (get().isPlaying) {
+        stopPlayback();
+        return;
+      }
+
+      set({ isPlaying: true });
+      playbackStartTime = audioContext.currentTime;
+      
+      schedulePlayback();
+
+      const updateProgress = () => {
+        const { totalDuration } = useTrackStore.getState(); // Leer en cada frame
+        const elapsedTime = audioContext.currentTime - playbackStartTime;
+
+        if (elapsedTime >= totalDuration) {
+          stopPlayback();
+        } else {
+          set({ playbackTime: elapsedTime });
+          animationFrameId = requestAnimationFrame(updateProgress);
+        }
+      };
+      animationFrameId = requestAnimationFrame(updateProgress);
+    },
+
+    handleExport: () => {
+      const { showFileNameModal } = useUIStore.getState();
+      showFileNameModal(async (fileName) => {
+        set({ isExporting: true });
+        try {
+          const { trackSlots, totalDuration, volumes, numSlots } = useTrackStore.getState();
+          const audioContext = getAudioContext();
+          let finalFileName = fileName;
+          if (!finalFileName) finalFileName = "napbak-beat.wav";
+          if (!finalFileName.toLowerCase().endsWith('.wav')) finalFileName += '.wav';
+
+          const offlineCtx = new OfflineAudioContext(2, audioContext.sampleRate * totalDuration, audioContext.sampleRate);
+          const measureDuration = (60 / BPM) * 4;
+
+          for (const trackType of TRACK_TYPES) {
+            let i = 0;
+            while (i < numSlots) {
+              const sample = trackSlots[trackType as TrackType][i];
+              if (sample) {
+                const audioBuffer = await get().loadAudioBuffer(sample.url);
+                if (audioBuffer) {
+                  const source = offlineCtx.createBufferSource();
+                  source.buffer = audioBuffer;
+                  const gainNode = offlineCtx.createGain();
+                  gainNode.gain.value = volumes[trackType as TrackType];
+                  source.connect(gainNode).connect(offlineCtx.destination);
+                  const scheduledTime = (i + (sample.offset || 0)) * measureDuration;
+                  const samplePlayDuration = (sample.duration || 1) * measureDuration;
+                  source.start(scheduledTime, 0, samplePlayDuration);
+                }
+                i += sample.duration || 1;
+              } else {
+                i++;
               }
-              i += sample.duration || 1;
-            } else {
-              i++;
             }
           }
-        }
 
-        const renderedBuffer = await offlineCtx.startRendering();
-        const wav = bufferToWav(renderedBuffer);
-        const blob = new Blob([wav], { type: 'audio/wav' });
+          const renderedBuffer = await offlineCtx.startRendering();
+          const wav = bufferToWav(renderedBuffer);
+          const blob = new Blob([wav], { type: 'audio/wav' });
 
-        if ('showSaveFilePicker' in window) {
-          try {
-            const handle = await window.showSaveFilePicker({
-              suggestedName: finalFileName,
-              types: [{ description: 'WAV file', accept: { 'audio/wav': ['.wav'] } }],
-            });
-            const writable = await handle.createWritable();
-            await writable.write(blob);
-            await writable.close();
-          } catch (err) {
-            console.log("Guardado cancelado por el usuario.", err);
+          if ('showSaveFilePicker' in window) {
+            try {
+              const handle = await window.showSaveFilePicker({
+                suggestedName: finalFileName,
+                types: [{ description: 'WAV file', accept: { 'audio/wav': ['.wav'] } }],
+              });
+              const writable = await handle.createWritable();
+              await writable.write(blob);
+              await writable.close();
+            } catch (err) {
+              console.log("Guardado cancelado por el usuario.", err);
+            }
+          } else {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            document.body.appendChild(a);
+            a.style.display = 'none';
+            a.href = url;
+            a.download = finalFileName;
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
           }
-        } else {
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          document.body.appendChild(a);
-          a.style.display = 'none';
-          a.href = url;
-          a.download = finalFileName;
-          a.click();
-          window.URL.revokeObjectURL(url);
-          document.body.removeChild(a);
+        } catch (error) {
+          console.error("Error durante la exportación:", error);
+        } finally {
+          set({ isExporting: false });
         }
-      } catch (error) {
-        console.error("Error durante la exportación:", error);
-      } finally {
-        set({ isExporting: false });
-      }
-    });
-  },
-}));
+      });
+    },
+  };
+
+  return store;
+});
 
 const bufferToWav = (buffer: AudioBuffer): DataView => {
     const numOfChan = buffer.numberOfChannels;

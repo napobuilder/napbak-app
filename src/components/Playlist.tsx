@@ -60,12 +60,13 @@ interface TrackProps {
     volume: number;
     slots: (Sample | null)[];
     numSlots: number;
+    slotWidth: number;
     setVolume: (trackType: TrackType, volume: number) => void;
     onDrop: (trackType: TrackType, slotIndex: number, sample: Sample) => void;
     onClear: (trackType: TrackType, instanceId: string) => void;
 }
 
-export const Track: React.FC<TrackProps> = ({ type, volume, slots, numSlots, setVolume, onDrop, onClear }) => {
+export const Track: React.FC<TrackProps> = ({ type, volume, slots, numSlots, slotWidth, setVolume, onDrop, onClear }) => {
     // Renderiza los samples que existen en los slots
     const renderedSamples = [];
     let i = 0;
@@ -98,7 +99,7 @@ export const Track: React.FC<TrackProps> = ({ type, volume, slots, numSlots, set
         />
     ));
     
-    const gridStyle = { gridTemplateColumns: `repeat(${numSlots}, 1fr)` };
+    const gridStyle = { gridTemplateColumns: `repeat(${numSlots}, ${slotWidth}px)` };
 
     return (
         <div className="bg-[#1E1E1E] mb-2.5 rounded-lg p-2.5 flex flex-col">

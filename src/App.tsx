@@ -10,9 +10,10 @@ import { PlaybackTracker } from './components/PlaybackTracker';
 import { PlaybackControls } from './components/PlaybackControls';
 import { FileNameModal } from './components/FileNameModal'; // Importar Modal
 import { AddBarsButton } from './components/AddBarsButton'; // Importar nuevo botón
+import { ZoomControls } from './components/ZoomControls';
 
 const TRACK_TYPES: TrackType[] = ['Drums', 'Bass', 'Melody', 'Fills', 'SFX'];
-
+const BASE_SLOT_WIDTH = 64; // Ancho base de un slot en píxeles
 const BPM = 90;
 
 // --- Componente del Cabezal de Reproducción ---
@@ -51,7 +52,7 @@ const App = () => {
   } = useTrackStore();
 
   const { init, isPlaying, playbackTime, isExporting, loadAudioBuffer, handlePlayPause, handleExport } = useAudioEngine();
-  const { isFileNameModalOpen, closeFileNameModal, onFileNameSubmit } = useUIStore();
+  const { isFileNameModalOpen, closeFileNameModal, onFileNameSubmit, zoomLevel, zoomIn, zoomOut } = useUIStore();
 
   useEffect(() => {
     init();
@@ -83,6 +84,7 @@ const App = () => {
     handleDropInStore(trackType, slotIndex, sample);
   };
 
+  const slotWidth = BASE_SLOT_WIDTH * zoomLevel;
   // La duración de la vista actual de la playlist
   const visibleDuration = numSlots * (60 / BPM) * 4;
 
@@ -93,15 +95,15 @@ const App = () => {
         <p className="text-[#b3b3b3] text-lg m-0">BPM: {BPM}</p>
       </header>
 
-      <div className="flex flex-row flex-1 gap-6 pt-6">
+      <div className="flex flex-row flex-1 gap-6 pt-6 min-h-0">
         {/* Left Panel: Sample Library */}
         <div className="w-80 flex-shrink-0">
           <SampleLibrary />
         </div>
 
         {/* Right Panel: Main Content */}
-        <div className="flex-1 flex flex-col">
-          <div className="flex flex-1 items-center gap-4">
+        <div className="flex-1 flex flex-col min-w-0">
+          <div className="flex flex-1 items-center gap-4 overflow-x-auto">
             <main className="relative flex-1 flex flex-col justify-around">
               <Playhead 
                 isPlaying={isPlaying}
@@ -116,6 +118,7 @@ const App = () => {
                   setVolume={setVolume}
                   slots={trackSlots[type as TrackType]}
                   numSlots={numSlots}
+                  slotWidth={slotWidth} // Pasar el ancho del slot
                   onDrop={handleDrop}
                   onClear={handleClear}
                 />
@@ -126,12 +129,15 @@ const App = () => {
 
           <div className="border-t border-[#282828] pt-4">
             <PlaybackTracker currentTime={playbackTime} totalDuration={totalDuration} />
-            <PlaybackControls
-              isPlaying={isPlaying}
-              isExporting={isExporting}
-              onPlayPause={handlePlayPause}
-              onExport={handleExport}
-            />
+            <div className="flex justify-between items-center mt-4">
+              <PlaybackControls
+                isPlaying={isPlaying}
+                isExporting={isExporting}
+                onPlayPause={handlePlayPause}
+                onExport={handleExport}
+              />
+              <ZoomControls onZoomIn={zoomIn} onZoomOut={zoomOut} />
+            </div>
           </div>
         </div>
       </div>
