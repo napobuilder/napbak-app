@@ -41,7 +41,7 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
     // Detener todas las fuentes previamente programadas para limpiar la línea de tiempo
     playingSources.forEach(source => { try { source.stop(); } catch {} });
 
-    const { trackSlots, numSlots } = useTrackStore.getState();
+    const { trackSlots, numSlots, soloedTrack, mutedTracks } = useTrackStore.getState();
     const newSources: AudioBufferSourceNode[] = [];
     const measureDuration = (60 / BPM) * 4;
     const currentTime = getAudioContext().currentTime;
@@ -50,6 +50,13 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
     for (const trackType of TRACK_TYPES) {
       const trackGainNode = get().trackGainNodes[trackType];
       if (!trackGainNode) continue;
+
+      // Lógica de Solo/Mute
+      const isMuted = mutedTracks.includes(trackType);
+      const anotherTrackIsSoloed = soloedTrack !== null && soloedTrack !== trackType;
+      if (isMuted || anotherTrackIsSoloed) {
+        continue; // Saltar la programación de esta pista
+      }
 
       let i = 0;
       while (i < numSlots) {
@@ -115,7 +122,12 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
 
       // Suscribirse a los cambios del track store para la edición en vivo
       useTrackStore.subscribe((state, prevState) => {
-        if (get().isPlaying && state.trackSlots !== prevState.trackSlots) {
+        const shouldReschedule = 
+          state.trackSlots !== prevState.trackSlots ||
+          state.mutedTracks !== prevState.mutedTracks ||
+          state.soloedTrack !== prevState.soloedTrack;
+
+        if (get().isPlaying && shouldReschedule) {
           schedulePlayback();
         }
       });

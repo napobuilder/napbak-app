@@ -7,9 +7,13 @@ const TRACK_TYPES: TrackType[] = ['Drums', 'Bass', 'Melody', 'Fills', 'SFX'];
 interface TrackState {
   trackSlots: Record<TrackType, (Sample | null)[]>;
   volumes: Record<TrackType, number>;
+  soloedTrack: TrackType | null;
+  mutedTracks: TrackType[];
   totalDuration: number;
   numSlots: number;
   addSlots: (amount: number) => void;
+  toggleSolo: (trackType: TrackType) => void;
+  toggleMute: (trackType: TrackType) => void;
   handleDrop: (trackType: TrackType, slotIndex: number, sample: Sample) => void;
   handleClear: (trackType: TrackType, instanceId: string) => void;
   setTotalDuration: (duration: number) => void;
@@ -28,6 +32,8 @@ export const useTrackStore = create<TrackState>((set, get) => ({
     Fills: 1.0,
     SFX: 1.0,
   },
+  soloedTrack: null,
+  mutedTracks: [],
   totalDuration: 0,
 
   addSlots: (amount) => {
@@ -42,6 +48,33 @@ export const useTrackStore = create<TrackState>((set, get) => ({
     }
 
     set({ trackSlots: newTrackSlots, numSlots: newNumSlots });
+  },
+
+  toggleSolo: (trackType) => {
+    set(state => {
+      const isAlreadySoloed = state.soloedTrack === trackType;
+      // Si al activar solo, la pista estaba muteada, la desmuteamos
+      const newMutedTracks = state.mutedTracks.filter(t => t !== trackType);
+      return {
+        soloedTrack: isAlreadySoloed ? null : trackType,
+        mutedTracks: newMutedTracks,
+      };
+    });
+  },
+
+  toggleMute: (trackType) => {
+    set(state => {
+      const isMuted = state.mutedTracks.includes(trackType);
+      const newMutedTracks = isMuted
+        ? state.mutedTracks.filter(t => t !== trackType)
+        : [...state.mutedTracks, trackType];
+      // Si se mutea una pista que está en solo, se desactiva el solo
+      const newSoloedTrack = state.soloedTrack === trackType ? null : state.soloedTrack;
+      return {
+        mutedTracks: newMutedTracks,
+        soloedTrack: newSoloedTrack,
+      };
+    });
   },
 
   setTotalDuration: (duration) => set({ totalDuration: duration }),

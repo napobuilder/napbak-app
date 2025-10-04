@@ -44,7 +44,11 @@ const App = () => {
     totalDuration,
     volumes,
     numSlots, // Leer numSlots desde el store
+    mutedTracks, // Estado de Mute
+    soloedTrack, // Estado de Solo
     addSlots, // Obtener la acción addSlots
+    toggleMute, // Acción de Mute
+    toggleSolo, // Acción de Solo
     setVolume,
     handleDrop: handleDropInStore,
     handleClear,
@@ -119,6 +123,10 @@ const App = () => {
                   slots={trackSlots[type as TrackType]}
                   numSlots={numSlots}
                   slotWidth={slotWidth} // Pasar el ancho del slot
+                  isMuted={mutedTracks.includes(type)}
+                  isSoloed={soloedTrack === type}
+                  onToggleMute={() => toggleMute(type)}
+                  onToggleSolo={() => toggleSolo(type)}
                   onDrop={handleDrop}
                   onClear={handleClear}
                 />
