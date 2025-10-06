@@ -1,22 +1,35 @@
 import React from 'react';
 import { useAudioEngine } from '../store/useAudioEngine';
-import { useTrackStore } from '../store/useTrackStore';
+import { useUIStore } from '../store/useUIStore';
+
+const BASE_SLOT_WIDTH = 64; // Ancho base de un slot en píxeles
+const GAP_SIZE_PIXELS = 10; // Corresponde a `gap-2.5` de Tailwind (0.625rem * 16px)
+const BPM = 90;
+const MEASURE_DURATION = (60 / BPM) * 4; // Duración de un compás/slot en segundos
 
 export const Playhead: React.FC = () => {
   const playbackTime = useAudioEngine(state => state.playbackTime);
-  const totalDuration = useTrackStore(state => state.totalDuration);
+  const zoomLevel = useUIStore(state => state.zoomLevel);
 
-  const progress = totalDuration > 0 ? (playbackTime / totalDuration) * 100 : 0;
+  // 1. Calcular el ancho actual de un slot basado en el zoom
+  const slotWidth = BASE_SLOT_WIDTH * zoomLevel;
 
-  // No renderizar el playhead si no hay duración
-  if (totalDuration <= 0) {
-    return null;
-  }
+  // 2. Convertir el tiempo de reproducción (en segundos) a una posición en slots (flotante)
+  const positionInSlots = playbackTime / MEASURE_DURATION;
+
+  // 3. Calcular el número de gaps que el playhead ya ha cruzado
+  const gapsCrossed = Math.floor(positionInSlots);
+
+  // 4. Convertir la posición en slots a una posición en píxeles, añadiendo el ancho de los gaps
+  const positionInPixels = (positionInSlots * slotWidth) + (gapsCrossed * GAP_SIZE_PIXELS);
 
   return (
     <div 
       className="absolute top-0 h-full w-0.5 pointer-events-none z-20"
-      style={{ left: `${progress}%` }}
+      style={{ 
+        transform: `translateX(${positionInPixels}px)`,
+        willChange: 'transform', // Optimización para el navegador
+      }}
     >
       {/* La flecha superior */}
       <div 
