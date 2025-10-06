@@ -1,24 +1,63 @@
 import { create } from 'zustand';
+import type { Sample } from '../types';
 
 const MAX_ZOOM = 5;
 const MIN_ZOOM = 0.5;
 const ZOOM_STEP = 0.5;
 
+// Utility function for throttling
+export const throttle = <T extends (...args: any[]) => void>(
+  func: T,
+  limit: number
+): ((...args: Parameters<T>) => void) => {
+  let inThrottle: boolean;
+  let lastFunc: NodeJS.Timeout;
+  let lastRan: number;
+  return function(this: any, ...args: Parameters<T>) {
+    const context = this;
+    if (!inThrottle) {
+      func.apply(context, args);
+      lastRan = Date.now();
+      inThrottle = true;
+    } else {
+      clearTimeout(lastFunc);
+      lastFunc = setTimeout(() => {
+        if ((Date.now() - lastRan) >= limit) {
+          func.apply(context, args);
+          lastRan = Date.now();
+        }
+      }, limit - (Date.now() - lastRan));
+    }
+  };
+};
+
+
 interface UIState {
   isFileNameModalOpen: boolean;
   onFileNameSubmit: ((fileName: string) => void) | null;
   zoomLevel: number;
+  activeSampleBrush: Sample | null;
+  isPainting: boolean;
+  isErasing: boolean;
   showFileNameModal: (onSubmit: (fileName: string) => void) => void;
   closeFileNameModal: () => void;
   setZoomLevel: (level: number) => void;
   zoomIn: () => void;
   zoomOut: () => void;
+  setActiveSampleBrush: (sample: Sample | null) => void;
+  startPainting: () => void;
+  stopPainting: () => void;
+  startErasing: () => void;
+  stopErasing: () => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
   isFileNameModalOpen: false,
   onFileNameSubmit: null,
   zoomLevel: 1,
+  activeSampleBrush: null,
+  isPainting: false,
+  isErasing: false,
 
   showFileNameModal: (onSubmit) => set({
     isFileNameModalOpen: true,
@@ -41,4 +80,11 @@ export const useUIStore = create<UIState>((set) => ({
   zoomOut: () => set((state) => ({
     zoomLevel: Math.max(MIN_ZOOM, state.zoomLevel - ZOOM_STEP),
   })),
+
+  setActiveSampleBrush: (sample) => set({ activeSampleBrush: sample }),
+
+  startPainting: () => set({ isPainting: true, isErasing: false }),
+  stopPainting: () => set({ isPainting: false }),
+  startErasing: () => set({ isErasing: true, isPainting: false }),
+  stopErasing: () => set({ isErasing: false }),
 }));

@@ -1,8 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTrackStore } from './store/useTrackStore';
 import { useAudioEngine } from './store/useAudioEngine';
 import { useUIStore } from './store/useUIStore'; // Importar UI Store
-import type { Sample, TrackType } from './types';
+import type { Sample } from './types';
 
 import { SampleLibrary } from './components/SampleLibrary';
 import { Mixer } from './components/Mixer'; // Importar el nuevo Mixer
@@ -13,7 +13,6 @@ import { FileNameModal } from './components/FileNameModal'; // Importar Modal
 import { AddBarsButton } from './components/AddBarsButton'; // Importar nuevo botón
 import { ZoomControls } from './components/ZoomControls';
 
-const TRACK_TYPES: TrackType[] = ['Drums', 'Bass', 'Melody', 'Fills', 'SFX'];
 const BASE_SLOT_WIDTH = 64; // Ancho base de un slot en píxeles
 const BPM = 90;
 
@@ -39,17 +38,61 @@ const Playhead: React.FC<PlayheadProps> = ({ isPlaying, playbackTime, totalDurat
   );
 };
 
+// --- Componente para la Zona de Drop de Nueva Pista ---
+interface NewTrackDropZoneProps {
+  onDrop: (sample: Sample) => void;
+}
+
+const NewTrackDropZone: React.FC<NewTrackDropZoneProps> = ({ onDrop }) => {
+  const [isOver, setIsOver] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsOver(false);
+    try {
+      const sampleData = JSON.parse(e.dataTransfer.getData('application/json'));
+      onDrop(sampleData);
+    } catch (error) {
+      console.error("Error parsing dropped sample data:", error);
+    }
+  };
+
+  const baseClasses = "h-20 flex items-center justify-center rounded-lg transition-colors duration-200 ease-in-out";
+  const inactiveClasses = "bg-[#181818] border-2 border-dashed border-[#333333]";
+  const activeClasses = "bg-[#2a2a2a] border-2 border-dashed border-[#1DB954]";
+
+  return (
+    <div 
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={`${baseClasses} ${isOver ? activeClasses : inactiveClasses}`}
+    >
+      <p className="text-[#b3b3b3]">Drag sample here to create a new track</p>
+    </div>
+  );
+};
+
+
 const App = () => {
   const {
-    trackSlots,
+    tracks,
     totalDuration,
-    volumes,
-    numSlots, // Leer numSlots desde el store
-    mutedTracks, // Estado de Mute
-    soloedTrack, // Estado de Solo
-    addSlots, // Obtener la acción addSlots
-    toggleMute, // Acción de Mute
-    toggleSolo, // Acción de Solo
+    numSlots,
+    addTrackWithSample,
+    addSlots,
+    toggleMute,
+    toggleSolo,
     setVolume,
     handleDrop: handleDropInStore,
     handleClear,
@@ -57,15 +100,42 @@ const App = () => {
   } = useTrackStore();
 
   const { init, isPlaying, playbackTime, isExporting, loadAudioBuffer, handlePlayPause, handleExport } = useAudioEngine();
-  const { isFileNameModalOpen, closeFileNameModal, onFileNameSubmit, zoomLevel, zoomIn, zoomOut } = useUIStore();
+  const { 
+    isFileNameModalOpen, 
+    closeFileNameModal, 
+    onFileNameSubmit, 
+    zoomLevel, 
+    zoomIn, 
+    zoomOut,
+    isPainting,
+    isErasing,
+    stopPainting,
+    stopErasing,
+  } = useUIStore();
 
   useEffect(() => {
     init();
   }, [init]);
 
+  // Global mouse up listener to stop painting/erasing modes
+  useEffect(() => {
+    const handleMouseUp = () => {
+      // Only act if we are in a painting or erasing state
+      if (isPainting || isErasing) {
+        stopPainting();
+        stopErasing();
+      }
+    };
+
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isPainting, isErasing, stopPainting, stopErasing]);
+
   useEffect(() => {
     // Pre-load audio for samples from persisted state on initial mount
-    const allSamples = Object.values(trackSlots).flat().filter(Boolean) as Sample[];
+    const allSamples = tracks.flatMap(track => track.slots).filter(Boolean) as Sample[];
     const uniqueUrls = new Set(allSamples.map(sample => sample.url));
     
     if (uniqueUrls.size > 0) {
@@ -81,10 +151,9 @@ const App = () => {
     const measureDuration = (60 / BPM) * 4;
     let maxEndSlot = 0;
 
-    for (const trackType in trackSlots) {
-      const slots = trackSlots[trackType as TrackType];
-      for (let i = 0; i < slots.length; i++) {
-        const sample = slots[i];
+    for (const track of tracks) {
+      for (let i = 0; i < track.slots.length; i++) {
+        const sample = track.slots[i];
         if (sample) {
           const endSlot = i + (sample.duration || 1);
           if (endSlot > maxEndSlot) {
@@ -96,15 +165,19 @@ const App = () => {
 
     const newTotalDuration = (maxEndSlot > 0 ? maxEndSlot : numSlots) * measureDuration;
     setTotalDuration(newTotalDuration);
-  }, [trackSlots, numSlots, setTotalDuration]);
+  }, [tracks, numSlots, setTotalDuration]);
 
-  const handleDrop = (trackType: TrackType, slotIndex: number, sample: Sample) => {
+  const handleDropOnExistingTrack = (trackId: string, slotIndex: number, sample: Sample) => {
     loadAudioBuffer(sample.url);
-    handleDropInStore(trackType, slotIndex, sample);
+    handleDropInStore(trackId, slotIndex, sample);
+  };
+
+  const handleDropOnNewTrack = (sample: Sample) => {
+    loadAudioBuffer(sample.url);
+    addTrackWithSample(sample);
   };
 
   const slotWidth = BASE_SLOT_WIDTH * zoomLevel;
-  // La duración de la vista actual de la playlist
   const visibleDuration = numSlots * (60 / BPM) * 4;
 
   return (
@@ -115,36 +188,33 @@ const App = () => {
       </header>
 
       <div className="flex flex-row flex-1 gap-6 pt-6 min-h-0">
-        {/* Left Panel: Sample Library */}
         <div className="w-80 flex-shrink-0">
           <SampleLibrary />
         </div>
 
-        {/* Center Panel: Mixer */}
         <div className="flex-shrink-0">
           <Mixer />
         </div>
 
-        {/* Right Panel: Main Content */}
         <div className="flex-1 flex flex-col min-w-0">
           <div className="flex flex-1 items-start gap-4 overflow-x-auto">
             <main className="relative flex-1 flex flex-col gap-2.5">
               <Playhead 
                 isPlaying={isPlaying}
                 playbackTime={playbackTime}
-                totalDuration={visibleDuration} // Usamos la duración visible, no la total de la canción
+                totalDuration={visibleDuration}
               />
-              {TRACK_TYPES.map(type => (
+              {tracks.map(track => (
                 <Track
-                  key={type}
-                  type={type}
-                  slots={trackSlots[type as TrackType]}
+                  key={track.id}
+                  track={track}
                   numSlots={numSlots}
-                  slotWidth={slotWidth} // Pasar el ancho del slot
-                  onDrop={handleDrop}
+                  slotWidth={slotWidth}
+                  onDrop={handleDropOnExistingTrack}
                   onClear={handleClear}
                 />
               ))}
+              <NewTrackDropZone onDrop={handleDropOnNewTrack} />
             </main>
             <AddBarsButton onClick={() => addSlots(8)} />
           </div>

@@ -1,9 +1,7 @@
 import { create } from 'zustand';
 import { useTrackStore } from './useTrackStore';
 import { useUIStore } from './useUIStore';
-import type { Sample, TrackType } from '../types';
-
-const TRACK_TYPES: TrackType[] = ['Drums', 'Bass', 'Melody', 'Fills', 'SFX'];
+import type { Sample, Track } from '../types';
 
 const BPM = 90;
 
@@ -24,7 +22,7 @@ interface AudioEngineState {
   previewUrl: string | null;
   trackGainNodes: { [key: string]: GainNode | null };
   init: () => void;
-  setTrackVolume: (trackType: TrackType, volume: number) => void;
+  setTrackVolume: (trackId: string, volume: number) => void;
   loadAudioBuffer: (url: string) => Promise<AudioBuffer | null>;
   previewSample: (url: string) => Promise<void>;
   handlePlayPause: () => Promise<void>;
@@ -41,26 +39,26 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
     // Detener todas las fuentes previamente programadas para limpiar la línea de tiempo
     playingSources.forEach(source => { try { source.stop(); } catch {} });
 
-    const { trackSlots, numSlots, soloedTrack, mutedTracks } = useTrackStore.getState();
+    const { tracks, numSlots, soloedTrackId } = useTrackStore.getState();
     const newSources: AudioBufferSourceNode[] = [];
     const measureDuration = (60 / BPM) * 4;
     const currentTime = getAudioContext().currentTime;
     const elapsedTime = currentTime - playbackStartTime;
 
-    for (const trackType of TRACK_TYPES) {
-      const trackGainNode = get().trackGainNodes[trackType];
+    for (const track of tracks) {
+      const trackGainNode = get().trackGainNodes[track.id];
       if (!trackGainNode) continue;
 
       // Lógica de Solo/Mute
-      const isMuted = mutedTracks.includes(trackType);
-      const anotherTrackIsSoloed = soloedTrack !== null && soloedTrack !== trackType;
+      const isMuted = track.isMuted;
+      const anotherTrackIsSoloed = soloedTrackId !== null && soloedTrackId !== track.id;
       if (isMuted || anotherTrackIsSoloed) {
         continue; // Saltar la programación de esta pista
       }
 
       let i = 0;
       while (i < numSlots) {
-        const sample = trackSlots[trackType as TrackType][i];
+        const sample = track.slots[i];
         if (sample) {
           const audioBuffer = audioBuffers[sample.url];
           if (audioBuffer) {
@@ -110,33 +108,61 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
     init: () => {
       if (get().isInitialized) return;
       const audioContext = getAudioContext();
-      const gainNodes: { [key: string]: GainNode } = {};
-      const initialVolumes = useTrackStore.getState().volumes;
-      for (const type of TRACK_TYPES) {
+      const initialGainNodes: { [key: string]: GainNode } = {};
+      const { tracks } = useTrackStore.getState();
+      for (const track of tracks) {
         const gainNode = audioContext.createGain();
-        gainNode.gain.value = initialVolumes[type];
+        gainNode.gain.setValueAtTime(track.volume, audioContext.currentTime);
         gainNode.connect(audioContext.destination);
-        gainNodes[type] = gainNode;
+        initialGainNodes[track.id] = gainNode;
       }
-      set({ trackGainNodes: gainNodes, isInitialized: true });
+      set({ trackGainNodes: initialGainNodes, isInitialized: true });
 
-      // Suscribirse a los cambios del track store para la edición en vivo
-      useTrackStore.subscribe((state, prevState) => {
-        const shouldReschedule = 
-          state.trackSlots !== prevState.trackSlots ||
-          state.mutedTracks !== prevState.mutedTracks ||
-          state.soloedTrack !== prevState.soloedTrack;
-
-        if (get().isPlaying && shouldReschedule) {
+      // Suscribirse a los cambios del track store para la edición en vivo y creación de pistas
+      useTrackStore.subscribe((currentState, prevState) => {
+        // Live playback update
+        if (get().isPlaying && currentState.tracks !== prevState.tracks) {
           schedulePlayback();
+        }
+
+        // Handle added tracks
+        if (currentState.tracks.length > prevState.tracks.length) {
+          const newTrack = currentState.tracks[currentState.tracks.length - 1];
+          if (!get().trackGainNodes[newTrack.id]) {
+            console.log(`Audio engine detected new track: ${newTrack.name}. Creating gain node.`);
+            const audioContext = getAudioContext();
+            const gainNode = audioContext.createGain();
+            gainNode.gain.setValueAtTime(newTrack.volume, audioContext.currentTime);
+            gainNode.connect(audioContext.destination);
+            set(state => ({
+              trackGainNodes: { ...state.trackGainNodes, [newTrack.id]: gainNode }
+            }));
+          }
+        }
+
+        // Handle removed tracks
+        if (currentState.tracks.length < prevState.tracks.length) {
+          const removedTrackId = prevState.tracks.find(pt => !currentState.tracks.some(ct => ct.id === pt.id))?.id;
+          if (removedTrackId) {
+            console.log(`Audio engine detected removed track. Disconnecting gain node.`);
+            const gainNode = get().trackGainNodes[removedTrackId];
+            gainNode?.disconnect();
+            set(state => {
+              const newGainNodes = { ...state.trackGainNodes };
+              delete newGainNodes[removedTrackId];
+              return { trackGainNodes: newGainNodes };
+            });
+          }
         }
       });
     },
 
-    setTrackVolume: (trackType, volume) => {
-      const gainNode = get().trackGainNodes[trackType];
+    setTrackVolume: (trackId, volume) => {
+      const gainNode = get().trackGainNodes[trackId];
       if (gainNode) {
-        gainNode.gain.setTargetAtTime(volume, getAudioContext().currentTime, 0.01);
+        const now = getAudioContext().currentTime;
+        gainNode.gain.cancelScheduledValues(now);
+        gainNode.gain.setTargetAtTime(volume, now, 0.015);
       }
     },
 
@@ -223,7 +249,7 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
       showFileNameModal(async (fileName) => {
         set({ isExporting: true });
         try {
-          const { trackSlots, totalDuration, volumes, numSlots } = useTrackStore.getState();
+          const { tracks, totalDuration, numSlots } = useTrackStore.getState();
           const audioContext = getAudioContext();
           let finalFileName = fileName;
           if (!finalFileName) finalFileName = "napbak-beat.wav";
@@ -232,17 +258,17 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
           const offlineCtx = new OfflineAudioContext(2, audioContext.sampleRate * totalDuration, audioContext.sampleRate);
           const measureDuration = (60 / BPM) * 4;
 
-          for (const trackType of TRACK_TYPES) {
+          for (const track of tracks) {
             let i = 0;
             while (i < numSlots) {
-              const sample = trackSlots[trackType as TrackType][i];
+              const sample = track.slots[i];
               if (sample) {
                 const audioBuffer = await get().loadAudioBuffer(sample.url);
                 if (audioBuffer) {
                   const source = offlineCtx.createBufferSource();
                   source.buffer = audioBuffer;
                   const gainNode = offlineCtx.createGain();
-                  gainNode.gain.value = volumes[trackType as TrackType];
+                  gainNode.gain.value = track.volume;
                   source.connect(gainNode).connect(offlineCtx.destination);
                   const scheduledTime = (i + (sample.offset || 0)) * measureDuration;
                   const samplePlayDuration = (sample.duration || 1) * measureDuration;

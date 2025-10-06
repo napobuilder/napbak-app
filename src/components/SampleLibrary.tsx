@@ -2,6 +2,7 @@ import React from 'react';
 import type { Sample, SampleCategory } from '../types';
 import { SAMPLES } from '../data';
 import { useAudioEngine } from '../store/useAudioEngine';
+import { useUIStore } from '../store/useUIStore';
 
 const CATEGORY_ORDER: SampleCategory[] = ['drums', 'bass', 'melody', 'fills', 'sfx'];
 
@@ -12,21 +13,31 @@ interface SampleItemProps {
 
 const SampleItem: React.FC<SampleItemProps> = ({ sample, category }) => {
   const { previewSample, previewUrl } = useAudioEngine();
+  const { activeSampleBrush, setActiveSampleBrush } = useUIStore();
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
     const sampleData = JSON.stringify({ ...sample, category });
     e.dataTransfer.setData('application/json', sampleData);
+    setActiveSampleBrush(sample); // Set brush on drag start
   };
 
   const isPlaying = previewUrl === sample.url;
+  const isSelected = activeSampleBrush?.id === sample.id;
+
+  const borderClasses = isSelected
+    ? 'border-blue-500' // Brush selected
+    : isPlaying
+    ? 'border-green-500' // Is previewing
+    : 'border-transparent'; // Default
 
   return (
     <div 
-      className={`p-2 rounded-md w-32 cursor-grab border-2 ${isPlaying ? 'border-green-500' : 'border-transparent'}`}
+      className={`p-2 rounded-md w-32 cursor-grab border-2 ${borderClasses}`}
       style={{backgroundColor: sample.color || '#282828'}} 
       draggable 
       onDragStart={handleDragStart}
-      onClick={() => previewSample(sample.url)}
+      onClick={() => previewSample(sample.url)} // Click now only previews
+      title={`Click to preview. Drag to use.`}
     >
       <p className="text-white m-0 whitespace-nowrap overflow-hidden text-ellipsis select-none text-sm">{sample.name}</p>
     </div>

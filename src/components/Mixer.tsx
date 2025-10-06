@@ -1,32 +1,20 @@
 import React from 'react';
 import { useTrackStore } from '../store/useTrackStore';
-import type { TrackType } from '../types';
 import { ChannelStrip } from './ChannelStrip';
 
-const TRACK_TYPES: TrackType[] = ['Drums', 'Bass', 'Melody', 'Fills', 'SFX'];
-
 export const Mixer: React.FC = () => {
-  const {
-    volumes,
-    mutedTracks,
-    soloedTrack,
-    setVolume,
-    toggleMute,
-    toggleSolo,
-  } = useTrackStore();
+  const { tracks, setVolume, toggleMute, toggleSolo, renameTrack } = useTrackStore();
 
   return (
     <div className="flex flex-col gap-2.5">
-      {TRACK_TYPES.map(type => (
+      {tracks.map(track => (
         <ChannelStrip
-          key={type}
-          type={type}
-          volume={volumes[type]}
-          isMuted={mutedTracks.includes(type)}
-          isSoloed={soloedTrack === type}
-          setVolume={(volume) => setVolume(type, volume)}
-          onToggleMute={() => toggleMute(type)}
-          onToggleSolo={() => toggleSolo(type)}
+          key={track.id}
+          track={track}
+          setVolume={(volume) => setVolume(track.id, volume)}
+          onToggleMute={() => toggleMute(track.id)}
+          onToggleSolo={() => toggleSolo(track.id)}
+          onRename={(newName) => renameTrack(track.id, newName)}
         />
       ))}
     </div>
