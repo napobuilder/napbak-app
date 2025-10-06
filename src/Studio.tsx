@@ -7,36 +7,18 @@ import type { Sample } from './types';
 import { SampleLibrary } from './components/SampleLibrary';
 import { Mixer } from './components/Mixer'; // Importar el nuevo Mixer
 import { Track } from './components/Playlist';
-import { PlaybackTracker } from './components/PlaybackTracker';
 import { PlaybackControls } from './components/PlaybackControls';
 import { FileNameModal } from './components/FileNameModal'; // Importar Modal
 import { AddBarsButton } from './components/AddBarsButton'; // Importar nuevo botón
 import { ZoomControls } from './components/ZoomControls';
+import { TimelineRuler } from './components/TimelineRuler';
+import { Playhead } from './components/Playhead';
+import { usePreloadAudio } from './hooks/usePreloadAudio';
+import { useGlobalMouseUp } from './hooks/useGlobalMouseUp';
+import { useTotalDuration } from './hooks/useTotalDuration';
 
 const BASE_SLOT_WIDTH = 64; // Ancho base de un slot en píxeles
 const BPM = 90;
-
-// --- Componente del Cabezal de Reproducción ---
-interface PlayheadProps {
-  isPlaying: boolean;
-  playbackTime: number;
-  totalDuration: number;
-}
-
-const Playhead: React.FC<PlayheadProps> = ({ isPlaying, playbackTime, totalDuration }) => {
-  if (!isPlaying || totalDuration === 0) {
-    return null;
-  }
-
-  const progress = (playbackTime / totalDuration) * 100;
-
-  return (
-    <div 
-      className="absolute top-0 w-0.5 h-full bg-[#1DB954] z-20"
-      style={{ left: `${progress}%` }}
-    />
-  );
-};
 
 // --- Componente para la Zona de Drop de Nueva Pista ---
 interface NewTrackDropZoneProps {
@@ -84,22 +66,17 @@ const NewTrackDropZone: React.FC<NewTrackDropZoneProps> = ({ onDrop }) => {
 };
 
 
-const App = () => {
+const Studio = () => {
   const {
     tracks,
-    totalDuration,
     numSlots,
     addTrackWithSample,
     addSlots,
-    toggleMute,
-    toggleSolo,
-    setVolume,
     handleDrop: handleDropInStore,
     handleClear,
-    setTotalDuration,
   } = useTrackStore();
 
-  const { init, isPlaying, playbackTime, isExporting, loadAudioBuffer, handlePlayPause, handleExport } = useAudioEngine();
+  const { init, isPlaying, isExporting, loadAudioBuffer, handlePlayPause, handleExport } = useAudioEngine();
   const { 
     isFileNameModalOpen, 
     closeFileNameModal, 
@@ -107,65 +84,15 @@ const App = () => {
     zoomLevel, 
     zoomIn, 
     zoomOut,
-    isPainting,
-    isErasing,
-    stopPainting,
-    stopErasing,
   } = useUIStore();
+
+  usePreloadAudio();
+  useGlobalMouseUp();
+  useTotalDuration();
 
   useEffect(() => {
     init();
   }, [init]);
-
-  // Global mouse up listener to stop painting/erasing modes
-  useEffect(() => {
-    const handleMouseUp = () => {
-      // Only act if we are in a painting or erasing state
-      if (isPainting || isErasing) {
-        stopPainting();
-        stopErasing();
-      }
-    };
-
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isPainting, isErasing, stopPainting, stopErasing]);
-
-  useEffect(() => {
-    // Pre-load audio for samples from persisted state on initial mount
-    const allSamples = tracks.flatMap(track => track.slots).filter(Boolean) as Sample[];
-    const uniqueUrls = new Set(allSamples.map(sample => sample.url));
-    
-    if (uniqueUrls.size > 0) {
-      console.log(`Pre-loading ${uniqueUrls.size} unique audio buffers from saved project...`);
-      uniqueUrls.forEach(url => {
-        loadAudioBuffer(url);
-      });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // IMPORTANT: Runs only once after rehydration
-
-  useEffect(() => {
-    const measureDuration = (60 / BPM) * 4;
-    let maxEndSlot = 0;
-
-    for (const track of tracks) {
-      for (let i = 0; i < track.slots.length; i++) {
-        const sample = track.slots[i];
-        if (sample) {
-          const endSlot = i + (sample.duration || 1);
-          if (endSlot > maxEndSlot) {
-            maxEndSlot = endSlot;
-          }
-        }
-      }
-    }
-
-    const newTotalDuration = (maxEndSlot > 0 ? maxEndSlot : numSlots) * measureDuration;
-    setTotalDuration(newTotalDuration);
-  }, [tracks, numSlots, setTotalDuration]);
 
   const handleDropOnExistingTrack = (trackId: string, slotIndex: number, sample: Sample) => {
     loadAudioBuffer(sample.url);
@@ -178,7 +105,6 @@ const App = () => {
   };
 
   const slotWidth = BASE_SLOT_WIDTH * zoomLevel;
-  const visibleDuration = numSlots * (60 / BPM) * 4;
 
   return (
     <div className="min-h-screen bg-[#121212] font-sans text-white p-6 flex flex-col">
@@ -192,18 +118,16 @@ const App = () => {
           <SampleLibrary />
         </div>
 
-        <div className="flex-shrink-0">
+        <div className="flex-shrink-0 flex flex-col gap-2.5">
+          <div className="h-6" /> {/* Espaciador para alinear con TimelineRuler */}
           <Mixer />
         </div>
 
         <div className="flex-1 flex flex-col min-w-0">
-          <div className="flex flex-1 items-start gap-4 overflow-x-auto">
-            <main className="relative flex-1 flex flex-col gap-2.5">
-              <Playhead 
-                isPlaying={isPlaying}
-                playbackTime={playbackTime}
-                totalDuration={visibleDuration}
-              />
+          <div className="relative flex-1 overflow-x-auto">
+            <Playhead />
+            <div className="flex flex-col gap-2.5">
+              <TimelineRuler />
               {tracks.map(track => (
                 <Track
                   key={track.id}
@@ -215,12 +139,10 @@ const App = () => {
                 />
               ))}
               <NewTrackDropZone onDrop={handleDropOnNewTrack} />
-            </main>
-            <AddBarsButton onClick={() => addSlots(8)} />
+            </div>
           </div>
 
           <div className="border-t border-[#282828] pt-4">
-            <PlaybackTracker currentTime={playbackTime} totalDuration={totalDuration} />
             <div className="flex justify-between items-center mt-4">
               <PlaybackControls
                 isPlaying={isPlaying}
@@ -248,4 +170,4 @@ const App = () => {
   );
 };
 
-export default App;
+export default Studio;

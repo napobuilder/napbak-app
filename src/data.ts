@@ -14,7 +14,7 @@ export const SAMPLES: Record<SampleCategory, Sample[]> = {
     { id: 'b3', name: 'Analog Sub', url: 'https://files.catbox.moe/xc7446.wav', type: 'Bass', duration: 1, color: '#3a86ff' },
   ],
   melody: [
-    { id: 'm1', name: 'Piano Loop (8 measures)', url: 'https://files.catbox.moe/k5k03s.wav', type: 'Melody', duration: 4, color: '#ff006e' },
+    { id: 'm1', name: 'Piano Loop (8 measures)', url: 'https://files.catbox.moe/k5k03s.wav', type: 'Melody', duration: 8, color: '#ff006e' },
     { id: 'm3', name: 'Freedom Chord', url: '/melodies/OS_VC2_90_songstarter_freedom_Fm.wav', type: 'Melody', duration: 4, color: '#e01e5a' },
     { id: 'm4', name: 'Vintage Ochre', url: '/melodies/AHA_LS_90_vintage_piano_loop_ochre.wav', type: 'Melody', duration: 4, color: '#d90429' },
     { id: 'm5', name: 'Fading EP (Abm)', url: '/melodies/DBM_SDRNB_FADING_electric_piano_90BPM_Ab-MINOR.wav', type: 'Melody', duration: 4, color: '#ef233c' },

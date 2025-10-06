@@ -5,13 +5,20 @@ import type { Sample, Track } from '../types';
 
 const BPM = 90;
 
-let audioContext: AudioContext;
-const getAudioContext = () => {
-  if (!audioContext) {
-    audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-  }
-  return audioContext;
-};
+const getAudioContext = (() => {
+  let audioContext: AudioContext | null = null;
+  return () => {
+    if (!audioContext) {
+      try {
+        audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      } catch (e) {
+        console.error("Web Audio API is not supported in this browser");
+        return null;
+      }
+    }
+    return audioContext;
+  };
+})();
 
 interface AudioEngineState {
   isInitialized: boolean;
@@ -22,10 +29,15 @@ interface AudioEngineState {
   previewUrl: string | null;
   trackGainNodes: { [key: string]: GainNode | null };
   init: () => void;
+  initializeTrackGainNodes: () => void;
+  subscribeToTrackStore: () => void;
   setTrackVolume: (trackId: string, volume: number) => void;
   loadAudioBuffer: (url: string) => Promise<AudioBuffer | null>;
   previewSample: (url: string) => Promise<void>;
   handlePlayPause: () => Promise<void>;
+  startPlayback: () => void;
+  stopPlayback: () => void;
+  seekPlayback: (time: number) => void;
   handleExport: () => void;
 }
 
@@ -34,15 +46,71 @@ let playingSources: AudioBufferSourceNode[] = [];
 let animationFrameId: number | null = null;
 let playbackStartTime = 0;
 
+const scheduleTrack = (
+  track: Track,
+  currentTime: number,
+  elapsedTime: number,
+  measureDuration: number,
+  numSlots: number,
+  trackGainNode: GainNode,
+  totalDuration: number
+) => {
+  const newSources: AudioBufferSourceNode[] = [];
+  const loopedElapsedTime = totalDuration > 0 ? elapsedTime % totalDuration : elapsedTime;
+
+  let i = 0;
+  while (i < numSlots) {
+    const sample = track.slots[i];
+    if (sample) {
+      const audioBuffer = audioBuffers[sample.url];
+      if (audioBuffer) {
+        const sampleDurationInSeconds = (sample.duration || 1) * measureDuration;
+        const sampleStartTimeInSeconds = (i + (sample.offset || 0)) * measureDuration;
+        const sampleEndTimeInSeconds = sampleStartTimeInSeconds + sampleDurationInSeconds;
+        const audioContext = getAudioContext();
+        if (!audioContext) return [];
+
+        // Case 1: The sample is completely in the future (relative to the looped time)
+        if (sampleStartTimeInSeconds >= loopedElapsedTime) {
+          const source = audioContext.createBufferSource();
+          source.buffer = audioBuffer;
+          source.connect(trackGainNode);
+          const startOffset = sampleStartTimeInSeconds - loopedElapsedTime;
+          source.start(currentTime + startOffset, 0, sampleDurationInSeconds);
+          newSources.push(source);
+        } 
+        // Case 2: The sample should be playing right now
+        else if (sampleEndTimeInSeconds > loopedElapsedTime) {
+          const offset = loopedElapsedTime - sampleStartTimeInSeconds;
+          const remainingDuration = sampleDurationInSeconds - offset;
+          const source = audioContext.createBufferSource();
+          source.buffer = audioBuffer;
+          source.connect(trackGainNode);
+          // Start immediately from the calculated offset and for the remaining duration
+          source.start(currentTime, offset, remainingDuration);
+          newSources.push(source);
+        }
+        // Case 3: The sample is completely in the past (do nothing)
+      }
+      i += sample.duration || 1;
+    } else {
+      i++;
+    }
+  }
+  return newSources;
+};
+
 export const useAudioEngine = create<AudioEngineState>((set, get) => {
   const schedulePlayback = () => {
     // Detener todas las fuentes previamente programadas para limpiar la línea de tiempo
     playingSources.forEach(source => { try { source.stop(); } catch {} });
 
-    const { tracks, numSlots, soloedTrackId } = useTrackStore.getState();
-    const newSources: AudioBufferSourceNode[] = [];
+    const { tracks, numSlots, soloedTrackId, totalDuration } = useTrackStore.getState();
+    let newSources: AudioBufferSourceNode[] = [];
     const measureDuration = (60 / BPM) * 4;
-    const currentTime = getAudioContext().currentTime;
+    const audioContext = getAudioContext();
+    if (!audioContext) return;
+    const currentTime = audioContext.currentTime;
     const elapsedTime = currentTime - playbackStartTime;
 
     for (const track of tracks) {
@@ -56,42 +124,16 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
         continue; // Saltar la programación de esta pista
       }
 
-      let i = 0;
-      while (i < numSlots) {
-        const sample = track.slots[i];
-        if (sample) {
-          const audioBuffer = audioBuffers[sample.url];
-          if (audioBuffer) {
-            const sampleDurationInSeconds = (sample.duration || 1) * measureDuration;
-            const sampleStartTimeInSeconds = (i + (sample.offset || 0)) * measureDuration;
-            const sampleEndTimeInSeconds = sampleStartTimeInSeconds + sampleDurationInSeconds;
-
-            // Caso 1: El sample está completamente en el futuro
-            if (sampleStartTimeInSeconds >= elapsedTime) {
-              const source = audioContext.createBufferSource();
-              source.buffer = audioBuffer;
-              source.connect(trackGainNode);
-              source.start(playbackStartTime + sampleStartTimeInSeconds, 0, sampleDurationInSeconds);
-              newSources.push(source);
-            } 
-            // Caso 2: El sample debería estar sonando ahora mismo
-            else if (sampleEndTimeInSeconds > elapsedTime) {
-              const offset = elapsedTime - sampleStartTimeInSeconds;
-              const remainingDuration = sampleDurationInSeconds - offset;
-              const source = audioContext.createBufferSource();
-              source.buffer = audioBuffer;
-              source.connect(trackGainNode);
-              // Empezar inmediatamente desde el offset calculado y por la duración restante
-              source.start(currentTime, offset, remainingDuration);
-              newSources.push(source);
-            }
-            // Caso 3: El sample está completamente en el pasado (no hacer nada)
-          }
-          i += sample.duration || 1;
-        } else {
-          i++;
-        }
-      }
+      const trackSources = scheduleTrack(
+        track,
+        currentTime,
+        elapsedTime,
+        measureDuration,
+        numSlots,
+        trackGainNode,
+        totalDuration
+      );
+      newSources = newSources.concat(trackSources);
     }
     playingSources = newSources;
   };
@@ -108,6 +150,19 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
     init: () => {
       if (get().isInitialized) return;
       const audioContext = getAudioContext();
+      if (!audioContext) return;
+
+      get().initializeTrackGainNodes();
+      get().subscribeToTrackStore();
+
+      set({ isInitialized: true });
+    },
+
+
+    initializeTrackGainNodes: () => {
+      const audioContext = getAudioContext();
+      if (!audioContext) return;
+
       const initialGainNodes: { [key: string]: GainNode } = {};
       const { tracks } = useTrackStore.getState();
       for (const track of tracks) {
@@ -116,9 +171,10 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
         gainNode.connect(audioContext.destination);
         initialGainNodes[track.id] = gainNode;
       }
-      set({ trackGainNodes: initialGainNodes, isInitialized: true });
+      set({ trackGainNodes: initialGainNodes });
+    },
 
-      // Suscribirse a los cambios del track store para la edición en vivo y creación de pistas
+    subscribeToTrackStore: () => {
       useTrackStore.subscribe((currentState, prevState) => {
         // Live playback update
         if (get().isPlaying && currentState.tracks !== prevState.tracks) {
@@ -131,6 +187,7 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
           if (!get().trackGainNodes[newTrack.id]) {
             console.log(`Audio engine detected new track: ${newTrack.name}. Creating gain node.`);
             const audioContext = getAudioContext();
+            if (!audioContext) return;
             const gainNode = audioContext.createGain();
             gainNode.gain.setValueAtTime(newTrack.volume, audioContext.currentTime);
             gainNode.connect(audioContext.destination);
@@ -211,37 +268,64 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
 
     handlePlayPause: async () => {
       const audioContext = getAudioContext();
+      if (!audioContext) return;
       if (audioContext.state === 'suspended') await audioContext.resume();
 
-      const stopPlayback = () => {
-        playingSources.forEach(source => { try { source.stop(); } catch {} });
-        playingSources = [];
-        if (animationFrameId) cancelAnimationFrame(animationFrameId);
-        set({ isPlaying: false, playbackTime: 0 });
-      };
-
       if (get().isPlaying) {
-        stopPlayback();
-        return;
+        get().stopPlayback();
+      } else {
+        get().startPlayback();
       }
+    },
+
+    startPlayback: () => {
+      const audioContext = getAudioContext();
+      if (!audioContext) return;
 
       set({ isPlaying: true });
-      playbackStartTime = audioContext.currentTime;
+      playbackStartTime = audioContext.currentTime - get().playbackTime;
       
       schedulePlayback();
 
       const updateProgress = () => {
-        const { totalDuration } = useTrackStore.getState(); // Leer en cada frame
-        const elapsedTime = audioContext.currentTime - playbackStartTime;
+        const { totalDuration } = useTrackStore.getState();
+        const now = audioContext.currentTime;
+        let elapsedTime = now - playbackStartTime;
 
-        if (elapsedTime >= totalDuration) {
-          stopPlayback();
-        } else {
-          set({ playbackTime: elapsedTime });
-          animationFrameId = requestAnimationFrame(updateProgress);
+        // Detect loop and reschedule audio
+        if (totalDuration > 0 && elapsedTime >= totalDuration) {
+          const overshoot = elapsedTime - totalDuration;
+          playbackStartTime = now - overshoot; // Reset time base for next loop
+          elapsedTime = overshoot; // The new elapsed time is the overshoot
+          schedulePlayback();
         }
+        
+        // Always set a looped time for the UI
+        const loopedTime = totalDuration > 0 ? elapsedTime % totalDuration : 0;
+        set({ playbackTime: loopedTime });
+
+        animationFrameId = requestAnimationFrame(updateProgress);
       };
       animationFrameId = requestAnimationFrame(updateProgress);
+    },
+
+    stopPlayback: () => {
+      playingSources.forEach(source => { try { source.stop(); } catch {} });
+      playingSources = [];
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      set({ isPlaying: false });
+    },
+
+    seekPlayback: (time) => {
+      const { isPlaying } = get();
+      const now = getAudioContext().currentTime;
+      
+      playbackStartTime = now - time;
+      set({ playbackTime: time });
+
+      if (isPlaying) {
+        schedulePlayback();
+      }
     },
 
     handleExport: () => {

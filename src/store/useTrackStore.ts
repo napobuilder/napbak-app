@@ -3,6 +3,12 @@ import { persist } from 'zustand/middleware';
 import type { Sample, Track, TrackType } from '../types';
 import { useAudioEngine } from './useAudioEngine';
 
+const BPM = 90;
+const calculateTotalDuration = (numSlots: number) => {
+  const measureDuration = (60 / BPM) * 4; // Duration of one measure (4 beats)
+  return numSlots * measureDuration;
+};
+
 const initialTracks: Track[] = [
   { id: crypto.randomUUID(), name: 'Drums', type: 'Drums', volume: 1.0, isMuted: false, isSoloed: false, slots: Array(16).fill(null) },
   { id: crypto.randomUUID(), name: 'Bass', type: 'Bass', volume: 1.0, isMuted: false, isSoloed: false, slots: Array(16).fill(null) },
@@ -10,6 +16,14 @@ const initialTracks: Track[] = [
   { id: crypto.randomUUID(), name: 'Fills', type: 'Fills', volume: 1.0, isMuted: false, isSoloed: false, slots: Array(16).fill(null) },
   { id: crypto.randomUUID(), name: 'SFX', type: 'SFX', volume: 1.0, isMuted: false, isSoloed: false, slots: Array(16).fill(null) },
 ];
+
+const initialNumSlots = 16;
+const initialState = {
+  tracks: initialTracks,
+  soloedTrackId: null,
+  numSlots: initialNumSlots,
+  totalDuration: calculateTotalDuration(initialNumSlots),
+};
 
 interface TrackState {
   tracks: Track[];
@@ -27,15 +41,13 @@ interface TrackState {
   handleClear: (trackId: string, instanceId: string) => void;
   setTotalDuration: (duration: number) => void;
   setVolume: (trackId: string, volume: number) => void;
+  resetProject: () => void;
 }
 
 export const useTrackStore = create<TrackState>()(
   persist(
     (set, get) => ({
-      tracks: initialTracks,
-      soloedTrackId: null,
-      numSlots: 16, // Empezamos con 16 slots
-      totalDuration: 0,
+      ...initialState,
 
       addTrack: () => {
         const newTrack: Track = {
@@ -78,12 +90,14 @@ export const useTrackStore = create<TrackState>()(
 
       addSlots: (amount) => {
         const newNumSlots = get().numSlots + amount;
+        const newTotalDuration = calculateTotalDuration(newNumSlots);
         set(state => ({
           tracks: state.tracks.map(track => ({
             ...track,
             slots: [...track.slots, ...Array(amount).fill(null)],
           })),
           numSlots: newNumSlots,
+          totalDuration: newTotalDuration,
         }));
       },
 
@@ -125,6 +139,10 @@ export const useTrackStore = create<TrackState>()(
           tracks: state.tracks.map(t => t.id === trackId ? { ...t, volume } : t),
         }));
         useAudioEngine.getState().setTrackVolume(trackId, volume);
+      },
+
+      resetProject: () => {
+        set(initialState);
       },
 
       handleDrop: (trackId, slotIndex, sample) => {
@@ -175,7 +193,7 @@ export const useTrackStore = create<TrackState>()(
       },
     }),
     {
-      name: 'napbak-project-v2', // Use a new name to avoid conflicts with old structure
+      name: 'napbak-project-v3', // Use a new name to avoid conflicts with old structure
       partialize: (state) =>
         Object.fromEntries(
           Object.entries(state).filter(([key]) => !['totalDuration'].includes(key))
