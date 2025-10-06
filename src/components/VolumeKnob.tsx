@@ -11,6 +11,7 @@ const VolumeKnob: React.FC<VolumeKnobProps> = ({ volume, onChange }) => {
   const [dragStart, setDragStart] = useState({ y: 0, volume: 0 });
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault(); // Prevenir comportamiento por defecto como el drag de texto
     setIsDragging(true);
     setDragStart({
       y: e.clientY,
@@ -53,12 +54,17 @@ const VolumeKnob: React.FC<VolumeKnobProps> = ({ volume, onChange }) => {
     <div
       ref={knobRef}
       onMouseDown={handleMouseDown}
-      className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center cursor-ns-resize select-none relative border-2 border-gray-900"
+      className="w-8 h-8 bg-gray-800 rounded-full flex items-center justify-center cursor-ns-resize select-none relative border-2 border-gray-900"
       title={`Volume: ${Math.round(volume * 100)}%`}
     >
-      <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center">
+      {isDragging && (
+        <div className="absolute z-10 -top-8 left-1/2 -translate-x-1/2 bg-gray-900 bg-opacity-80 text-white text-xs rounded px-2 py-1 shadow-lg pointer-events-none">
+          {`${Math.round(volume * 100)}%`}
+        </div>
+      )}
+      <div className="w-6 h-6 bg-gray-700 rounded-full flex items-center justify-center">
         <div
-          className="w-1 h-3 bg-green-500 rounded-full absolute top-1"
+          className="w-1 h-2 bg-green-500 rounded-full absolute top-1"
           style={{ transform: `rotate(${rotation}deg)`, transformOrigin: 'bottom center' }}
         />
       </div>

@@ -23,17 +23,17 @@ export const TrackControls: React.FC<TrackControlsProps> = ({
     : 'bg-gray-600 text-white hover:bg-gray-500';
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-row items-center gap-1">
       <button 
         onClick={onToggleMute}
-        className={`w-8 h-8 rounded-md font-bold text-sm transition-colors duration-150 ${muteClasses}`}
+        className={`w-7 h-7 rounded-md font-bold text-xs transition-colors duration-150 ${muteClasses}`}
         aria-label={isMuted ? 'Unmute track' : 'Mute track'}
       >
         M
       </button>
       <button 
         onClick={onToggleSolo}
-        className={`w-8 h-8 rounded-md font-bold text-sm transition-colors duration-150 ${soloClasses}`}
+        className={`w-7 h-7 rounded-md font-bold text-xs transition-colors duration-150 ${soloClasses}`}
         aria-label={isSoloed ? 'Unsolo track' : 'Solo track'}
       >
         S

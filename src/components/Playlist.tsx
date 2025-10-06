@@ -1,10 +1,6 @@
 
 import React, { useState } from 'react';
 import type { Sample, TrackType } from '../types';
-import VolumeKnob from './VolumeKnob'; // Importamos el Knob
-import { TrackControls } from './TrackControls'; // Importar controles S/M
-
- 
 
 // --- Componentes de la UI ---
 
@@ -16,7 +12,7 @@ interface SampleBlockProps {
 
 const SampleBlock: React.FC<SampleBlockProps> = ({ sample, onClear, style }) => (
     <div 
-        className={`p-1 rounded-md flex justify-between items-center relative text-white min-w-0`}
+        className={`p-1 rounded-md flex justify-between items-center relative text-white min-w-0 h-full`}
         style={style}
     >
         <p className="m-1 text-xs overflow-hidden text-ellipsis whitespace-nowrap pointer-events-none">{sample.name}</p>
@@ -58,30 +54,18 @@ const EmptySlot: React.FC<EmptySlotProps> = ({ onDrop }) => {
 
 interface TrackProps {
     type: TrackType;
-    volume: number;
     slots: (Sample | null)[];
     numSlots: number;
     slotWidth: number;
-    isMuted: boolean;
-    isSoloed: boolean;
-    onToggleMute: () => void;
-    onToggleSolo: () => void;
-    setVolume: (trackType: TrackType, volume: number) => void;
     onDrop: (trackType: TrackType, slotIndex: number, sample: Sample) => void;
     onClear: (trackType: TrackType, instanceId: string) => void;
 }
 
 export const Track: React.FC<TrackProps> = ({ 
     type, 
-    volume, 
     slots, 
     numSlots, 
     slotWidth, 
-    isMuted, 
-    isSoloed, 
-    onToggleMute, 
-    onToggleSolo, 
-    setVolume, 
     onDrop, 
     onClear 
 }) => {
@@ -120,22 +104,9 @@ export const Track: React.FC<TrackProps> = ({
     const gridStyle = { gridTemplateColumns: `repeat(${numSlots}, ${slotWidth}px)` };
 
     return (
-        <div className="bg-[#1E1E1E] mb-2.5 rounded-lg p-2.5 flex flex-col">
-            <div className="flex items-center mb-2.5 gap-4">
-                <TrackControls 
-                    isMuted={isMuted}
-                    isSoloed={isSoloed}
-                    onToggleMute={onToggleMute}
-                    onToggleSolo={onToggleSolo}
-                />
-                <VolumeKnob 
-                    volume={volume} 
-                    onChange={(newVolume) => setVolume(type, newVolume)} 
-                />
-                <span className="text-sm text-gray-400 w-12 text-center">{`${Math.round(volume * 100)}%`}</span>
-                <p className="text-white font-bold m-0">{type}</p>
-            </div>
-            <div className="grid gap-2.5 w-full min-h-[60px] relative" style={gridStyle}>
+        <div className="bg-[#1E1E1E] rounded-lg p-2.5 flex items-center" style={{ height: '80px' }}>
+            {/* Línea de Tiempo de Samples */}
+            <div className="grid gap-2.5 w-full h-full relative" style={gridStyle}>
                 {/* Capa de fondo para dropear */}
                 <div className="absolute inset-0 grid gap-2.5 w-full h-full" style={gridStyle}>
                     {dropGrid}

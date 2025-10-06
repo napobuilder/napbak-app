@@ -5,6 +5,7 @@ import { useUIStore } from './store/useUIStore'; // Importar UI Store
 import type { Sample, TrackType } from './types';
 
 import { SampleLibrary } from './components/SampleLibrary';
+import { Mixer } from './components/Mixer'; // Importar el nuevo Mixer
 import { Track } from './components/Playlist';
 import { PlaybackTracker } from './components/PlaybackTracker';
 import { PlaybackControls } from './components/PlaybackControls';
@@ -63,6 +64,20 @@ const App = () => {
   }, [init]);
 
   useEffect(() => {
+    // Pre-load audio for samples from persisted state on initial mount
+    const allSamples = Object.values(trackSlots).flat().filter(Boolean) as Sample[];
+    const uniqueUrls = new Set(allSamples.map(sample => sample.url));
+    
+    if (uniqueUrls.size > 0) {
+      console.log(`Pre-loading ${uniqueUrls.size} unique audio buffers from saved project...`);
+      uniqueUrls.forEach(url => {
+        loadAudioBuffer(url);
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // IMPORTANT: Runs only once after rehydration
+
+  useEffect(() => {
     const measureDuration = (60 / BPM) * 4;
     let maxEndSlot = 0;
 
@@ -105,10 +120,15 @@ const App = () => {
           <SampleLibrary />
         </div>
 
+        {/* Center Panel: Mixer */}
+        <div className="flex-shrink-0">
+          <Mixer />
+        </div>
+
         {/* Right Panel: Main Content */}
         <div className="flex-1 flex flex-col min-w-0">
-          <div className="flex flex-1 items-center gap-4 overflow-x-auto">
-            <main className="relative flex-1 flex flex-col justify-around">
+          <div className="flex flex-1 items-start gap-4 overflow-x-auto">
+            <main className="relative flex-1 flex flex-col gap-2.5">
               <Playhead 
                 isPlaying={isPlaying}
                 playbackTime={playbackTime}
@@ -118,15 +138,9 @@ const App = () => {
                 <Track
                   key={type}
                   type={type}
-                  volume={volumes[type as TrackType]}
-                  setVolume={setVolume}
                   slots={trackSlots[type as TrackType]}
                   numSlots={numSlots}
                   slotWidth={slotWidth} // Pasar el ancho del slot
-                  isMuted={mutedTracks.includes(type)}
-                  isSoloed={soloedTrack === type}
-                  onToggleMute={() => toggleMute(type)}
-                  onToggleSolo={() => toggleSolo(type)}
                   onDrop={handleDrop}
                   onClear={handleClear}
                 />
