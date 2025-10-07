@@ -13,6 +13,8 @@ import { AddBarsButton } from './components/AddBarsButton'; // Importar nuevo bo
 import { ZoomControls } from './components/ZoomControls';
 import { TimelineRuler } from './components/TimelineRuler';
 import { Playhead } from './components/Playhead';
+import { TimeDisplay } from './components/TimeDisplay';
+import { SongOverview } from './components/SongOverview';
 import { usePreloadAudio } from './hooks/usePreloadAudio';
 import { useGlobalMouseUp } from './hooks/useGlobalMouseUp';
 
@@ -74,7 +76,7 @@ const Studio = () => {
     handleClear,
   } = useTrackStore();
 
-  const { init, isPlaying, isExporting, loadAudioBuffer, handlePlayPause, handleExport } = useAudioEngine();
+  const { init, isPlaying, playbackTime, isExporting, loadAudioBuffer, handlePlayPause, handleExport } = useAudioEngine();
   const { 
     isFileNameModalOpen, 
     closeFileNameModal, 
@@ -85,6 +87,31 @@ const Studio = () => {
 
   usePreloadAudio();
   useGlobalMouseUp();
+
+  // Disable global context menu
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+    document.addEventListener('contextmenu', handleContextMenu);
+    return () => {
+      document.removeEventListener('contextmenu', handleContextMenu);
+    };
+  }, []);
+
+  // Global spacebar play/pause
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        handlePlayPause();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handlePlayPause]);
 
   useEffect(() => {
     init();
@@ -106,6 +133,10 @@ const Studio = () => {
         <img src="/napbak app.png" alt="Napbak Logo" className="h-10 w-auto" />
         <p className="text-[#b3b3b3] text-lg m-0">BPM: {BPM}</p>
       </header>
+
+      <div className="pt-4 pb-2">
+        <SongOverview />
+      </div>
 
       <div className="flex flex-row flex-1 gap-6 pt-6 min-h-0">
         <div className="w-80 flex-shrink-0">
@@ -147,6 +178,7 @@ const Studio = () => {
                 onPlayPause={handlePlayPause}
                 onExport={handleExport}
               />
+              <TimeDisplay currentTime={playbackTime} />
               <ZoomControls onZoomIn={zoomIn} onZoomOut={zoomOut} />
             </div>
           </div>
