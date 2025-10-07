@@ -9,12 +9,14 @@ export const SAMPLES: Record<SampleCategory, Sample[]> = {
     { id: 'd4', name: 'Crimelord', url: '/drums/SO_SL_90_drum_loop_crimelord.wav', type: 'Drums', duration: 1, color: '#fb5607' },
     { id: 'd5', name: 'Leyland', url: '/drums/SO_SL_90_drum_loop_leyland.wav', type: 'Drums', duration: 1, color: '#fb5607' },
     { id: 'd6', name: 'Pomeranian', url: '/drums/SO_SL_90_top_loop_acoustic_pomeranian.wav', type: 'Drums', duration: 1, color: '#fb5607' },
+    { id: 'd7', name: 'Perc Tops', url: '/drums/OS_LFC_90_Drum_Loop_13__Perc_Tops_.wav', type: 'Drums', duration: 1, color: '#ffbe0b' },
+    { id: 'd8', name: 'Cymbal Crash', url: '/drums/SLK_cymbal_crash_long.wav', type: 'Drums', duration: 1, color: '#fb5607' }
   ],
   bass: [
     { id: 'b3', name: 'Analog Sub', url: 'https://files.catbox.moe/xc7446.wav', type: 'Bass', duration: 1, color: '#3a86ff' },
   ],
   melody: [
-    { id: 'm1', name: 'Piano Loop (8 measures)', url: 'https://files.catbox.moe/k5k03s.wav', type: 'Melody', duration: 4, color: '#ff006e' },
+    { id: 'm1', name: 'Piano Loop (8 measures)', url: '/melodies/ORBIT_ERA_90_chord_piano_loop_vintage_creeper_F-sharp-min.wav', type: 'Melody', duration: 4, color: '#ff006e' },
     { id: 'm3', name: 'Freedom Chord', url: '/melodies/OS_VC2_90_songstarter_freedom_Fm.wav', type: 'Melody', duration: 4, color: '#e01e5a' },
     { id: 'm4', name: 'Vintage Ochre', url: '/melodies/AHA_LS_90_vintage_piano_loop_ochre.wav', type: 'Melody', duration: 4, color: '#d90429' },
     { id: 'm5', name: 'Fading EP (Abm)', url: '/melodies/DBM_SDRNB_FADING_electric_piano_90BPM_Ab-MINOR.wav', type: 'Melody', duration: 4, color: '#ef233c' },
@@ -26,6 +28,7 @@ export const SAMPLES: Record<SampleCategory, Sample[]> = {
   ],
   sfx: [
     { id: 's1', name: 'Scratch', url: '/sfx/cd_fx90_scratchness.wav', type: 'SFX', duration: 1, color: '#8338ec' },
+    { id: 's2', name: 'Scratch Cuts', url: '/sfx/RHH2_90_scratch_loop_cuts.wav', type: 'SFX', duration: 1, color: '#8338ec' }
   ],
 
 };
