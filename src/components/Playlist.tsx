@@ -119,14 +119,14 @@ export const Track: React.FC<TrackProps> = ({
     onDrop,
     onClear
 }) => {
-    const activeSlots = useTrackStore(state => state.activeSlots);
+    const numSlots = useTrackStore(state => state.numSlots);
     const zoomLevel = useUIStore(state => state.zoomLevel);
     const slotWidth = BASE_SLOT_WIDTH * zoomLevel;
 
     // Renderiza los samples que existen en los slots
     const renderedSamples = [];
     let i = 0;
-    while (i < activeSlots) {
+    while (i < numSlots) {
         const sample = track.slots[i];
         if (sample) {
             const duration = sample.duration || 1;
@@ -148,14 +148,14 @@ export const Track: React.FC<TrackProps> = ({
     }
 
     // Renderiza una rejilla de fondo con zonas para dropear
-    const dropGrid = Array.from({ length: activeSlots }).map((_, index) => (
+    const dropGrid = Array.from({ length: numSlots }).map((_, index) => (
         <EmptySlot 
             key={index} 
             onDrop={(droppedSample) => onDrop(track.id, index, droppedSample)} 
         />
     ));
     
-    const gridStyle = { gridTemplateColumns: `repeat(${activeSlots}, ${slotWidth}px)` };
+    const gridStyle = { gridTemplateColumns: `repeat(${numSlots}, ${slotWidth}px)` };
 
     return (
         <div className="bg-[#1E1E1E] rounded-lg p-2.5 flex items-center" style={{ height: '80px' }}>

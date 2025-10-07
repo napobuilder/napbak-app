@@ -179,16 +179,27 @@ export const useTrackStore = create<TrackState>()(
       },
 
       handleDrop: (trackId, slotIndex, sample) => {
-        const { tracks, numSlots } = get();
+        // Get the functions we'll need
+        const { addSlots, updateTotalDuration } = get();
+        
+        // --- Step 1: Check if we need to expand the playlist BEFORE doing anything else ---
+        const initialNumSlots = get().numSlots;
+        const duration = sample.duration || 1;
+        const endPosition = slotIndex + duration;
+
+        if (endPosition >= initialNumSlots) {
+          const SLOTS_TO_ADD = 16;
+          const neededSlots = endPosition - initialNumSlots;
+          addSlots(neededSlots + SLOTS_TO_ADD);
+        }
+
+        // --- Step 2: Now that slots are (potentially) added, get the FINAL state ---
+        const { tracks } = get();
         const targetTrack = tracks.find(t => t.id === trackId);
         if (!targetTrack) return;
 
-        const duration = sample.duration || 1;
-        if (slotIndex + duration > numSlots) {
-          console.warn("No hay suficiente espacio para este sample.");
-          return;
-        }
-
+        // --- Step 3: Perform validation and placement on the final state ---
+        // Check for overlap
         for (let i = 0; i < duration; i++) {
           if (targetTrack.slots[slotIndex + i]) {
             console.warn("No se puede colocar el sample aquí, hay un solapamiento.");
@@ -196,8 +207,9 @@ export const useTrackStore = create<TrackState>()(
           }
         }
 
-        set(state => ({
-          tracks: state.tracks.map(t => {
+        // Place the sample
+        set({
+          tracks: tracks.map(t => {
             if (t.id === trackId) {
               const newSlots = [...t.slots];
               newSlots[slotIndex] = { ...sample, instanceId: crypto.randomUUID() };
@@ -205,8 +217,9 @@ export const useTrackStore = create<TrackState>()(
             }
             return t;
           }),
-        }));
-        get().updateTotalDuration();
+        });
+        
+        updateTotalDuration();
       },
 
       handleClear: (trackId, instanceId) => {
