@@ -2,6 +2,9 @@
 import React, { useState } from 'react';
 import type { Sample, Track } from '../types';
 import { useUIStore } from '../store/useUIStore';
+import { useTrackStore } from '../store/useTrackStore';
+
+const BASE_SLOT_WIDTH = 64; // Mover constante aquí para que sea accesible
 
 // --- Componentes de la UI ---
 
@@ -107,23 +110,23 @@ const EmptySlot: React.FC<EmptySlotProps> = ({ onDrop }) => {
 
 interface TrackProps {
     track: Track;
-    numSlots: number;
-    slotWidth: number;
     onDrop: (trackId: string, slotIndex: number, sample: Sample) => void;
     onClear: (trackId: string, instanceId: string) => void;
 }
 
 export const Track: React.FC<TrackProps> = ({
     track,
-    numSlots,
-    slotWidth,
     onDrop,
     onClear
 }) => {
+    const activeSlots = useTrackStore(state => state.activeSlots);
+    const zoomLevel = useUIStore(state => state.zoomLevel);
+    const slotWidth = BASE_SLOT_WIDTH * zoomLevel;
+
     // Renderiza los samples que existen en los slots
     const renderedSamples = [];
     let i = 0;
-    while (i < numSlots) {
+    while (i < activeSlots) {
         const sample = track.slots[i];
         if (sample) {
             const duration = sample.duration || 1;
@@ -145,14 +148,14 @@ export const Track: React.FC<TrackProps> = ({
     }
 
     // Renderiza una rejilla de fondo con zonas para dropear
-    const dropGrid = Array.from({ length: numSlots }).map((_, index) => (
+    const dropGrid = Array.from({ length: activeSlots }).map((_, index) => (
         <EmptySlot 
             key={index} 
             onDrop={(droppedSample) => onDrop(track.id, index, droppedSample)} 
         />
     ));
     
-    const gridStyle = { gridTemplateColumns: `repeat(${numSlots}, ${slotWidth}px)` };
+    const gridStyle = { gridTemplateColumns: `repeat(${activeSlots}, ${slotWidth}px)` };
 
     return (
         <div className="bg-[#1E1E1E] rounded-lg p-2.5 flex items-center" style={{ height: '80px' }}>

@@ -4,32 +4,58 @@ import type { Sample, Track, TrackType } from '../types';
 import { useAudioEngine } from './useAudioEngine';
 
 const BPM = 90;
-const calculateTotalDuration = (numSlots: number) => {
-  const measureDuration = (60 / BPM) * 4; // Duration of one measure (4 beats)
-  return numSlots * measureDuration;
+const MIN_LOOP_SLOTS = 4; // Mínimo de compases para el loop
+const MEASURE_DURATION = (60 / BPM) * 4; // Duración de un compás en segundos
+
+// --- Funciones de Lógica de Duración ---
+
+const calculateDurationInSeconds = (numSlots: number) => {
+  return numSlots * MEASURE_DURATION;
 };
 
+const calculateActiveSlots = (tracks: Track[]): number => {
+  let lastSlot = 0;
+  for (const track of tracks) {
+    for (let i = 0; i < track.slots.length; i++) {
+      const sample = track.slots[i];
+      if (sample) {
+        const endSlot = i + (sample.duration || 1);
+        if (endSlot > lastSlot) {
+          lastSlot = endSlot;
+        }
+      }
+    }
+  }
+  return Math.max(MIN_LOOP_SLOTS, lastSlot);
+};
+
+// --- Estado Inicial ---
+
+const initialNumSlots = 32;
 const initialTracks: Track[] = [
-  { id: crypto.randomUUID(), name: 'Drums', type: 'Drums', volume: 1.0, isMuted: false, isSoloed: false, slots: Array(16).fill(null) },
-  { id: crypto.randomUUID(), name: 'Bass', type: 'Bass', volume: 1.0, isMuted: false, isSoloed: false, slots: Array(16).fill(null) },
-  { id: crypto.randomUUID(), name: 'Melody', type: 'Melody', volume: 1.0, isMuted: false, isSoloed: false, slots: Array(16).fill(null) },
-  { id: crypto.randomUUID(), name: 'Fills', type: 'Fills', volume: 1.0, isMuted: false, isSoloed: false, slots: Array(16).fill(null) },
-  { id: crypto.randomUUID(), name: 'SFX', type: 'SFX', volume: 1.0, isMuted: false, isSoloed: false, slots: Array(16).fill(null) },
+  { id: crypto.randomUUID(), name: 'Drums', type: 'Drums', volume: 1.0, isMuted: false, isSoloed: false, slots: Array(initialNumSlots).fill(null) },
+  { id: crypto.randomUUID(), name: 'Bass', type: 'Bass', volume: 1.0, isMuted: false, isSoloed: false, slots: Array(initialNumSlots).fill(null) },
+  { id: crypto.randomUUID(), name: 'Melody', type: 'Melody', volume: 1.0, isMuted: false, isSoloed: false, slots: Array(initialNumSlots).fill(null) },
+  { id: crypto.randomUUID(), name: 'Fills', type: 'Fills', volume: 1.0, isMuted: false, isSoloed: false, slots: Array(initialNumSlots).fill(null) },
+  { id: crypto.randomUUID(), name: 'SFX', type: 'SFX', volume: 1.0, isMuted: false, isSoloed: false, slots: Array(initialNumSlots).fill(null) },
 ];
 
-const initialNumSlots = 16;
 const initialState = {
   tracks: initialTracks,
   soloedTrackId: null,
   numSlots: initialNumSlots,
-  totalDuration: calculateTotalDuration(initialNumSlots),
+  activeSlots: MIN_LOOP_SLOTS,
+  totalDuration: calculateDurationInSeconds(MIN_LOOP_SLOTS), // Inicia con el loop mínimo
 };
+
+// --- Definición del Store ---
 
 interface TrackState {
   tracks: Track[];
   soloedTrackId: string | null;
   totalDuration: number;
   numSlots: number;
+  activeSlots: number;
   addTrack: () => void;
   addTrackWithSample: (sample: Sample) => void;
   removeTrack: (trackId: string) => void;
@@ -39,9 +65,9 @@ interface TrackState {
   toggleMute: (trackId: string) => void;
   handleDrop: (trackId: string, slotIndex: number, sample: Sample) => void;
   handleClear: (trackId: string, instanceId: string) => void;
-  setTotalDuration: (duration: number) => void;
   setVolume: (trackId: string, volume: number) => void;
   resetProject: () => void;
+  updateTotalDuration: () => void;
 }
 
 export const useTrackStore = create<TrackState>()(
@@ -49,11 +75,19 @@ export const useTrackStore = create<TrackState>()(
     (set, get) => ({
       ...initialState,
 
+      updateTotalDuration: () => {
+        const newActiveSlots = calculateActiveSlots(get().tracks);
+        const newDuration = calculateDurationInSeconds(newActiveSlots);
+        if (get().totalDuration !== newDuration) {
+          set({ totalDuration: newDuration, activeSlots: newActiveSlots });
+        }
+      },
+
       addTrack: () => {
         const newTrack: Track = {
           id: crypto.randomUUID(),
           name: `Track ${get().tracks.length + 1}`,
-          type: 'Melody', // Default type, can be changed later
+          type: 'Melody',
           volume: 1.0,
           isMuted: false,
           isSoloed: false,
@@ -68,7 +102,7 @@ export const useTrackStore = create<TrackState>()(
 
         const newTrack: Track = {
           id: crypto.randomUUID(),
-          name: sample.type, // Smart naming!
+          name: sample.type,
           type: sample.type,
           volume: 1.0,
           isMuted: false,
@@ -76,10 +110,12 @@ export const useTrackStore = create<TrackState>()(
           slots: newSlots,
         };
         set(state => ({ tracks: [...state.tracks, newTrack] }));
+        get().updateTotalDuration();
       },
 
       removeTrack: (trackId) => {
         set(state => ({ tracks: state.tracks.filter(t => t.id !== trackId) }));
+        get().updateTotalDuration();
       },
 
       renameTrack: (trackId, newName) => {
@@ -90,15 +126,14 @@ export const useTrackStore = create<TrackState>()(
 
       addSlots: (amount) => {
         const newNumSlots = get().numSlots + amount;
-        const newTotalDuration = calculateTotalDuration(newNumSlots);
         set(state => ({
           tracks: state.tracks.map(track => ({
             ...track,
             slots: [...track.slots, ...Array(amount).fill(null)],
           })),
           numSlots: newNumSlots,
-          totalDuration: newTotalDuration,
         }));
+        get().updateTotalDuration();
       },
 
       toggleSolo: (trackId) => {
@@ -120,10 +155,9 @@ export const useTrackStore = create<TrackState>()(
         set(state => ({
           tracks: state.tracks.map(t => {
             if (t.id === trackId) {
-              // If muting a soloed track, deactivate solo
               const newSoloedId = t.isSoloed ? null : state.soloedTrackId;
               if (newSoloedId !== state.soloedTrackId) {
-                (state as any).soloedTrackId = newSoloedId; // Not ideal, but for the sake of atomicity
+                (state as any).soloedTrackId = newSoloedId;
               }
               return { ...t, isMuted: !t.isMuted, isSoloed: t.isSoloed ? false : t.isSoloed };
             }
@@ -131,8 +165,6 @@ export const useTrackStore = create<TrackState>()(
           }),
         }));
       },
-
-      setTotalDuration: (duration) => set({ totalDuration: duration }),
 
       setVolume: (trackId, volume) => {
         set(state => ({
@@ -143,6 +175,7 @@ export const useTrackStore = create<TrackState>()(
 
       resetProject: () => {
         set(initialState);
+        get().updateTotalDuration();
       },
 
       handleDrop: (trackId, slotIndex, sample) => {
@@ -156,7 +189,6 @@ export const useTrackStore = create<TrackState>()(
           return;
         }
 
-        // Overlap check
         for (let i = 0; i < duration; i++) {
           if (targetTrack.slots[slotIndex + i]) {
             console.warn("No se puede colocar el sample aquí, hay un solapamiento.");
@@ -174,6 +206,7 @@ export const useTrackStore = create<TrackState>()(
             return t;
           }),
         }));
+        get().updateTotalDuration();
       },
 
       handleClear: (trackId, instanceId) => {
@@ -190,14 +223,12 @@ export const useTrackStore = create<TrackState>()(
             return t;
           }),
         }));
+        get().updateTotalDuration();
       },
     }),
     {
-      name: 'napbak-project-v3', // Use a new name to avoid conflicts with old structure
-      partialize: (state) =>
-        Object.fromEntries(
-          Object.entries(state).filter(([key]) => !['totalDuration'].includes(key))
-        ),
+      name: 'napbak-project-v3', // Mantener el nombre para la compatibilidad
+      // Ya no filtramos `totalDuration`, se guardará con el resto del proyecto.
     }
   )
 );

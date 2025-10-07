@@ -15,7 +15,7 @@ import { TimelineRuler } from './components/TimelineRuler';
 import { Playhead } from './components/Playhead';
 import { usePreloadAudio } from './hooks/usePreloadAudio';
 import { useGlobalMouseUp } from './hooks/useGlobalMouseUp';
-import { useTotalDuration } from './hooks/useTotalDuration';
+
 
 const BASE_SLOT_WIDTH = 64; // Ancho base de un slot en píxeles
 const BPM = 90;
@@ -69,9 +69,7 @@ const NewTrackDropZone: React.FC<NewTrackDropZoneProps> = ({ onDrop }) => {
 const Studio = () => {
   const {
     tracks,
-    numSlots,
     addTrackWithSample,
-    addSlots,
     handleDrop: handleDropInStore,
     handleClear,
   } = useTrackStore();
@@ -81,14 +79,12 @@ const Studio = () => {
     isFileNameModalOpen, 
     closeFileNameModal, 
     onFileNameSubmit, 
-    zoomLevel, 
     zoomIn, 
     zoomOut,
   } = useUIStore();
 
   usePreloadAudio();
   useGlobalMouseUp();
-  useTotalDuration();
 
   useEffect(() => {
     init();
@@ -103,8 +99,6 @@ const Studio = () => {
     loadAudioBuffer(sample.url);
     addTrackWithSample(sample);
   };
-
-  const slotWidth = BASE_SLOT_WIDTH * zoomLevel;
 
   return (
     <div className="min-h-screen bg-[#121212] font-sans text-white p-6 flex flex-col">
@@ -132,13 +126,16 @@ const Studio = () => {
                 <Track
                   key={track.id}
                   track={track}
-                  numSlots={numSlots}
-                  slotWidth={slotWidth}
                   onDrop={handleDropOnExistingTrack}
                   onClear={handleClear}
                 />
               ))}
-              <NewTrackDropZone onDrop={handleDropOnNewTrack} />
+              <div className="flex gap-2.5">
+                <div className="flex-1">
+                  <NewTrackDropZone onDrop={handleDropOnNewTrack} />
+                </div>
+                <AddBarsButton />
+              </div>
             </div>
           </div>
 

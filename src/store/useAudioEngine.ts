@@ -288,7 +288,7 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
       schedulePlayback();
 
       const updateProgress = () => {
-        const { totalDuration } = useTrackStore.getState();
+        const { totalDuration } = useTrackStore.getState(); // Obtener el valor más reciente en cada frame
         const now = audioContext.currentTime;
         let elapsedTime = now - playbackStartTime;
 
