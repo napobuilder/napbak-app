@@ -129,6 +129,20 @@ const Studio = () => {
   const handleLoadProject = (project: Project) => {
     loadProject(project.project_data);
     setProjectName(project.name);
+
+    // Preload all audio buffers for the newly loaded tracks
+    const urlsToLoad = new Set<string>();
+    if (project.project_data && project.project_data.tracks) {
+      for (const track of project.project_data.tracks) {
+        for (const sample of track.slots) {
+          if (sample) {
+            urlsToLoad.add(sample.url);
+          }
+        }
+      }
+    }
+    urlsToLoad.forEach(url => loadAudioBuffer(url));
+
     closeProjectPanel();
     toast.success(`Project '${project.name}' loaded successfully!`);
   };
@@ -158,6 +172,10 @@ const Studio = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+          return;
+        }
         e.preventDefault();
         handlePlayPause();
       }
