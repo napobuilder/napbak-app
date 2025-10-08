@@ -32,18 +32,23 @@ export const throttle = <T extends (...args: any[]) => void>(
 };
 
 
+type ProjectPanelContent = 'save' | 'load';
+
 interface UIState {
   isFileNameModalOpen: boolean;
   onFileNameSubmit: ((fileName: string) => void) | null;
-  isProjectPanelOpen: boolean; // Nuevo estado para el panel
+  isProjectPanelOpen: boolean;
+  projectPanelContent: ProjectPanelContent | null;
+  projectName: string | null;
   zoomLevel: number;
   activeSampleBrush: Sample | null;
   isPainting: boolean;
   isErasing: boolean;
   showFileNameModal: (onSubmit: (fileName: string) => void) => void;
   closeFileNameModal: () => void;
-  openProjectPanel: () => void; // Nueva acción
-  closeProjectPanel: () => void; // Nueva acción
+  openProjectPanel: (content: ProjectPanelContent) => void;
+  closeProjectPanel: () => void;
+  setProjectName: (name: string | null) => void;
   setZoomLevel: (level: number) => void;
   zoomIn: () => void;
   zoomOut: () => void;
@@ -57,7 +62,9 @@ interface UIState {
 export const useUIStore = create<UIState>((set) => ({
   isFileNameModalOpen: false,
   onFileNameSubmit: null,
-  isProjectPanelOpen: false, // Valor inicial
+  isProjectPanelOpen: false,
+  projectPanelContent: null,
+  projectName: null,
   zoomLevel: 1,
   activeSampleBrush: null,
   isPainting: false,
@@ -73,8 +80,17 @@ export const useUIStore = create<UIState>((set) => ({
     onFileNameSubmit: null,
   }),
 
-  openProjectPanel: () => set({ isProjectPanelOpen: true }),
-  closeProjectPanel: () => set({ isProjectPanelOpen: false }),
+  openProjectPanel: (content) => set({ 
+    isProjectPanelOpen: true, 
+    projectPanelContent: content 
+  }),
+
+  closeProjectPanel: () => set({ 
+    isProjectPanelOpen: false, 
+    projectPanelContent: null 
+  }),
+
+  setProjectName: (name) => set({ projectName: name }),
 
   setZoomLevel: (level) => set({
     zoomLevel: Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, level)),

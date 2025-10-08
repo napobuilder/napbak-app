@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { useTrackStore } from './store/useTrackStore';
+import { useTrackStore, type TrackState } from './store/useTrackStore';
 import { useAudioEngine } from './store/useAudioEngine';
 import { useUIStore } from './store/useUIStore';
 import { useAuthStore } from './store/useAuthStore';
 import { supabase } from './lib/supabaseClient';
+import { Toaster, toast } from 'sonner';
 import type { Sample } from './types';
 
 import { Auth } from './components/Auth';
@@ -18,8 +19,9 @@ import { TimelineRuler } from './components/TimelineRuler';
 import { Playhead } from './components/Playhead';
 import { TimeDisplay } from './components/TimeDisplay';
 import { SongOverview } from './components/SongOverview';
-import { ProjectPanel } from './components/ProjectPanel'; // Importar Panel
-import { SaveProjectView } from './components/SaveProjectView'; // Importar Vista de Guardado
+import { ProjectPanel } from './components/ProjectPanel';
+import { SaveProjectView } from './components/SaveProjectView';
+import { LoadProjectView } from './components/LoadProjectView';
 import { usePreloadAudio } from './hooks/usePreloadAudio';
 import { useGlobalMouseUp } from './hooks/useGlobalMouseUp';
 
@@ -73,13 +75,14 @@ const NewTrackDropZone: React.FC<NewTrackDropZoneProps> = ({ onDrop }) => {
 
 const Studio = () => {
   const { session } = useAuthStore();
-  const { tracks, numSlots } = useTrackStore();
+  const { tracks, numSlots, loadProject, resetProject } = useTrackStore();
   const { init, isPlaying, playbackTime, isExporting, loadAudioBuffer, handlePlayPause, handleExport } = useAudioEngine();
   const { 
     isFileNameModalOpen, 
     closeFileNameModal, 
     onFileNameSubmit, 
     isProjectPanelOpen,
+    projectPanelContent,
     openProjectPanel,
     closeProjectPanel,
     zoomIn, 
@@ -93,7 +96,7 @@ const Studio = () => {
 
   const handleSaveProject = async (projectName: string) => {
     if (!session) {
-      alert('You must be logged in to save a project.');
+      toast.error('You must be logged in to save a project.');
       return;
     }
     
@@ -111,12 +114,25 @@ const Studio = () => {
 
       if (error) throw error;
 
-      alert(`Project '${projectName}' saved successfully!`);
+      toast.success(`Project '${projectName}' saved successfully!`);
       closeProjectPanel();
     } catch (error: any) {
-      alert(`Error saving project: ${error.message}`);
+      toast.error(`Error saving project: ${error.message}`);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleLoadProject = (projectData: Partial<TrackState>) => {
+    loadProject(projectData);
+    closeProjectPanel();
+    toast.success('Project loaded successfully!');
+  };
+
+  const handleNewProject = () => {
+    if (window.confirm('Are you sure you want to start a new project? All unsaved changes will be lost.')) {
+      resetProject();
+      toast.success('New project started.');
     }
   };
 
@@ -161,16 +177,24 @@ const Studio = () => {
 
   return (
     <div className="min-h-screen bg-[#121212] font-sans text-white p-6 flex flex-col">
+      <Toaster richColors />
       <header className="flex justify-between items-center border-b border-[#282828] pb-4 flex-shrink-0">
         <div className="flex items-center gap-4">
           <img src="/napbak app.png" alt="Napbak Logo" className="h-10 w-auto" />
           <button 
-            onClick={openProjectPanel}
+            onClick={handleNewProject}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200"
+          >
+            New Project
+          </button>
+          <button 
+            onClick={() => openProjectPanel('save')}
             className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200"
           >
             Save Project
           </button>
           <button 
+            onClick={() => openProjectPanel('load')}
             className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200"
           >
             Load Projects
@@ -241,8 +265,16 @@ const Studio = () => {
         }}
       />
 
-      <ProjectPanel title="Save Project" isOpen={isProjectPanelOpen} onClose={closeProjectPanel}>
-        <SaveProjectView onSave={handleSaveProject} isLoading={isSaving} />
+      <ProjectPanel 
+        title={projectPanelContent === 'load' ? 'Load Project' : 'Save Project'}
+        isOpen={isProjectPanelOpen}
+        onClose={closeProjectPanel}
+      >
+        {projectPanelContent === 'load' ? (
+          <LoadProjectView onLoadProject={handleLoadProject} />
+        ) : (
+          <SaveProjectView onSave={handleSaveProject} isLoading={isSaving} />
+        )}
       </ProjectPanel>
     </div>
   );

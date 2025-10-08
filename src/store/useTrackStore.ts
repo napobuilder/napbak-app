@@ -50,7 +50,7 @@ const initialState = {
 
 // --- Definición del Store ---
 
-interface TrackState {
+export interface TrackState {
   tracks: Track[];
   soloedTrackId: string | null;
   totalDuration: number;
@@ -68,12 +68,18 @@ interface TrackState {
   setVolume: (trackId: string, volume: number) => void;
   resetProject: () => void;
   updateTotalDuration: () => void;
+  loadProject: (projectData: Partial<TrackState>) => void;
 }
 
 export const useTrackStore = create<TrackState>()(
   persist(
     (set, get) => ({
       ...initialState,
+
+      loadProject: (projectData) => {
+        set(projectData);
+        get().updateTotalDuration();
+      },
 
       updateTotalDuration: () => {
         const newActiveSlots = calculateActiveSlots(get().tracks);

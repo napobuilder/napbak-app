@@ -19,6 +19,13 @@ export interface Track {
   slots: (Sample | null)[];
 }
 
+export interface Project {
+  id: string;
+  name: string;
+  updated_at: string;
+  project_data: any; // Can be refined later to match TrackStore state
+}
+
 export type SampleCategory = 'drums' | 'bass' | 'melody' | 'fills' | 'sfx';
 
 export type TrackType = 'Drums' | 'Bass' | 'Melody' | 'Fills' | 'SFX';
