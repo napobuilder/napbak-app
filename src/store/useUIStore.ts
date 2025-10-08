@@ -35,12 +35,15 @@ export const throttle = <T extends (...args: any[]) => void>(
 interface UIState {
   isFileNameModalOpen: boolean;
   onFileNameSubmit: ((fileName: string) => void) | null;
+  isProjectPanelOpen: boolean; // Nuevo estado para el panel
   zoomLevel: number;
   activeSampleBrush: Sample | null;
   isPainting: boolean;
   isErasing: boolean;
   showFileNameModal: (onSubmit: (fileName: string) => void) => void;
   closeFileNameModal: () => void;
+  openProjectPanel: () => void; // Nueva acción
+  closeProjectPanel: () => void; // Nueva acción
   setZoomLevel: (level: number) => void;
   zoomIn: () => void;
   zoomOut: () => void;
@@ -54,6 +57,7 @@ interface UIState {
 export const useUIStore = create<UIState>((set) => ({
   isFileNameModalOpen: false,
   onFileNameSubmit: null,
+  isProjectPanelOpen: false, // Valor inicial
   zoomLevel: 1,
   activeSampleBrush: null,
   isPainting: false,
@@ -68,6 +72,9 @@ export const useUIStore = create<UIState>((set) => ({
     isFileNameModalOpen: false,
     onFileNameSubmit: null,
   }),
+
+  openProjectPanel: () => set({ isProjectPanelOpen: true }),
+  closeProjectPanel: () => set({ isProjectPanelOpen: false }),
 
   setZoomLevel: (level) => set({
     zoomLevel: Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, level)),

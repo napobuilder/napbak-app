@@ -4,7 +4,7 @@ import type { Sample, Track, TrackType } from '../types';
 import { useAudioEngine } from './useAudioEngine';
 
 const BPM = 90;
-const MIN_LOOP_SLOTS = 4; // Mínimo de compases para el loop
+const MIN_LOOP_SLOTS = 1; // Mínimo de compases para el loop
 const MEASURE_DURATION = (60 / BPM) * 4; // Duración de un compás en segundos
 
 // --- Funciones de Lógica de Duración ---
