@@ -5,7 +5,7 @@ import { useUIStore } from './store/useUIStore';
 import { useAuthStore } from './store/useAuthStore';
 import { supabase } from './lib/supabaseClient';
 import { Toaster, toast } from 'sonner';
-import type { Sample } from './types';
+import type { Sample, Project } from './types';
 
 import { Auth } from './components/Auth';
 import { SampleLibrary } from './components/SampleLibrary';
@@ -83,6 +83,8 @@ const Studio = () => {
     onFileNameSubmit, 
     isProjectPanelOpen,
     projectPanelContent,
+    projectName,
+    setProjectName,
     openProjectPanel,
     closeProjectPanel,
     zoomIn, 
@@ -114,6 +116,7 @@ const Studio = () => {
 
       if (error) throw error;
 
+      setProjectName(projectName);
       toast.success(`Project '${projectName}' saved successfully!`);
       closeProjectPanel();
     } catch (error: any) {
@@ -123,16 +126,26 @@ const Studio = () => {
     }
   };
 
-  const handleLoadProject = (projectData: Partial<TrackState>) => {
-    loadProject(projectData);
+  const handleLoadProject = (project: Project) => {
+    loadProject(project.project_data);
+    setProjectName(project.name);
     closeProjectPanel();
-    toast.success('Project loaded successfully!');
+    toast.success(`Project '${project.name}' loaded successfully!`);
   };
 
   const handleNewProject = () => {
     if (window.confirm('Are you sure you want to start a new project? All unsaved changes will be lost.')) {
       resetProject();
+      setProjectName(null);
       toast.success('New project started.');
+    }
+  };
+
+  const handleSaveClick = () => {
+    if (projectName) {
+      handleSaveProject(projectName);
+    } else {
+      openProjectPanel('save');
     }
   };
 
@@ -188,10 +201,16 @@ const Studio = () => {
             New Project
           </button>
           <button 
-            onClick={() => openProjectPanel('save')}
+            onClick={handleSaveClick}
             className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200"
           >
             Save Project
+          </button>
+          <button 
+            onClick={() => openProjectPanel('save')}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200"
+          >
+            Save As...
           </button>
           <button 
             onClick={() => openProjectPanel('load')}
@@ -200,7 +219,10 @@ const Studio = () => {
             Load Projects
           </button>
         </div>
-        <p className="text-[#b3b3b3] text-lg m-0">BPM: {BPM}</p>
+        <div className="text-right">
+          <h1 className="text-xl font-bold truncate">{projectName || 'Untitled Project'}</h1>
+          <p className="text-[#b3b3b3] text-lg m-0">BPM: {BPM}</p>
+        </div>
       </header>
 
       <div className="pt-4 pb-2">

@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import type { Project } from '../types';
 
 interface LoadProjectViewProps {
-  onLoadProject: (projectData: any) => void; // Tipado como 'any' por ahora
+  onLoadProject: (project: Project) => void;
 }
 
 export const LoadProjectView: React.FC<LoadProjectViewProps> = ({ onLoadProject }) => {
@@ -54,7 +54,7 @@ export const LoadProjectView: React.FC<LoadProjectViewProps> = ({ onLoadProject 
         projects.map((project) => (
           <button
             key={project.id}
-            onClick={() => onLoadProject(project.project_data)}
+            onClick={() => onLoadProject(project)}
             className="w-full text-left p-3 rounded-md bg-gray-800 hover:bg-gray-700 transition-colors duration-150"
           >
             <p className="font-bold text-white">{project.name}</p>
