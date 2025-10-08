@@ -27,6 +27,7 @@ interface AudioEngineState {
   isExporting: boolean;
   previewSource: AudioBufferSourceNode | null;
   previewUrl: string | null;
+  loadingPreviewUrl: string | null; // Lock to prevent race conditions
   trackGainNodes: { [key: string]: GainNode | null };
   init: () => void;
   initializeTrackGainNodes: () => void;
@@ -35,6 +36,7 @@ interface AudioEngineState {
   loadAudioBuffer: (url: string) => Promise<AudioBuffer | null>;
   previewSample: (url: string) => Promise<void>;
   handlePlayPause: () => Promise<void>;
+  handleStop: () => void;
   startPlayback: () => void;
   stopPlayback: () => void;
   seekPlayback: (time: number) => void;
@@ -145,6 +147,7 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
     isExporting: false,
     previewSource: null,
     previewUrl: null,
+    loadingPreviewUrl: null,
     trackGainNodes: {},
 
     init: () => {
@@ -175,41 +178,44 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
     },
 
     subscribeToTrackStore: () => {
-      useTrackStore.subscribe((currentState, prevState) => {
-        // Live playback update
-        if (get().isPlaying && currentState.tracks !== prevState.tracks) {
-          schedulePlayback();
-        }
+      // This subscription ensures gain nodes are always in sync with the tracks state.
+      useTrackStore.subscribe((state, prevState) => {
+        const audioContext = getAudioContext();
+        if (!audioContext) return;
 
-        // Handle added tracks
-        if (currentState.tracks.length > prevState.tracks.length) {
-          const newTrack = currentState.tracks[currentState.tracks.length - 1];
-          if (!get().trackGainNodes[newTrack.id]) {
-            console.log(`Audio engine detected new track: ${newTrack.name}. Creating gain node.`);
-            const audioContext = getAudioContext();
-            if (!audioContext) return;
+        const currentTrackIds = new Set(state.tracks.map(t => t.id));
+        const newGainNodes = { ...get().trackGainNodes };
+        let gainNodesChanged = false;
+
+        // Create gain nodes for new tracks (including on initial hydration)
+        for (const track of state.tracks) {
+          if (!newGainNodes[track.id]) {
+            console.log(`Audio engine: Creating and connecting gain node for track ${track.id}`);
             const gainNode = audioContext.createGain();
-            gainNode.gain.setValueAtTime(newTrack.volume, audioContext.currentTime);
+            gainNode.gain.setValueAtTime(track.volume, audioContext.currentTime);
             gainNode.connect(audioContext.destination);
-            set(state => ({
-              trackGainNodes: { ...state.trackGainNodes, [newTrack.id]: gainNode }
-            }));
+            newGainNodes[track.id] = gainNode;
+            gainNodesChanged = true;
           }
         }
 
-        // Handle removed tracks
-        if (currentState.tracks.length < prevState.tracks.length) {
-          const removedTrackId = prevState.tracks.find(pt => !currentState.tracks.some(ct => ct.id === pt.id))?.id;
-          if (removedTrackId) {
-            console.log(`Audio engine detected removed track. Disconnecting gain node.`);
-            const gainNode = get().trackGainNodes[removedTrackId];
-            gainNode?.disconnect();
-            set(state => {
-              const newGainNodes = { ...state.trackGainNodes };
-              delete newGainNodes[removedTrackId];
-              return { trackGainNodes: newGainNodes };
-            });
+        // Disconnect and remove gain nodes for deleted tracks
+        for (const trackId in newGainNodes) {
+          if (!currentTrackIds.has(trackId)) {
+            console.log(`Audio engine: Disconnecting and removing gain node for track ${trackId}`);
+            newGainNodes[trackId]?.disconnect();
+            delete newGainNodes[trackId];
+            gainNodesChanged = true;
           }
+        }
+
+        if (gainNodesChanged) {
+          set({ trackGainNodes: newGainNodes });
+        }
+
+        // If playback is active and tracks/slots have changed, reschedule audio
+        if (get().isPlaying && state.tracks !== prevState.tracks) {
+          schedulePlayback();
         }
       });
     },
@@ -225,10 +231,17 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
 
     loadAudioBuffer: async (url) => {
       if (audioBuffers[url]) return audioBuffers[url];
+      const audioContext = getAudioContext();
+      if (!audioContext) return null;
+
+      // Ensure the audio context is active before decoding
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+
       try {
         const response = await fetch(url);
         const arrayBuffer = await response.arrayBuffer();
-        const audioContext = getAudioContext();
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
         audioBuffers[url] = audioBuffer;
         return audioBuffer;
@@ -240,29 +253,57 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
 
     previewSample: async (url) => {
       const audioContext = getAudioContext();
+      if (!audioContext) return;
       if (audioContext.state === 'suspended') await audioContext.resume();
 
-      if (get().previewUrl === url) {
-        get().previewSource?.stop();
+      const { previewSource, previewUrl, loadingPreviewUrl } = get();
+
+      // If we are already loading a sample, ignore subsequent clicks.
+      if (loadingPreviewUrl) {
+        return;
+      }
+
+      // Stop any currently playing sample.
+      if (previewSource) {
+        previewSource.onended = null; // Avoid race conditions with the onended handler
+        previewSource.stop();
+      }
+
+      // If the click is on the currently playing sample, just stop it (toggle off).
+      if (previewUrl === url) {
         set({ previewSource: null, previewUrl: null });
         return;
       }
 
-      if (get().previewSource) get().previewSource?.stop();
-      set({ previewSource: null, previewUrl: null });
+      try {
+        // Set the lock
+        set({ loadingPreviewUrl: url });
 
-      const audioBuffer = await get().loadAudioBuffer(url);
-      if (audioBuffer) {
-        const source = audioContext.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(audioContext.destination);
-        source.start(0);
-        set({ previewSource: source, previewUrl: url });
-        source.onended = () => {
-          if (get().previewSource === source) {
-            set({ previewSource: null, previewUrl: null });
-          }
-        };
+        const audioBuffer = await get().loadAudioBuffer(url);
+
+        if (audioBuffer) {
+          const newSource = audioContext.createBufferSource();
+          newSource.buffer = audioBuffer;
+          newSource.connect(audioContext.destination);
+          newSource.start(0);
+
+          set({ previewSource: newSource, previewUrl: url });
+
+          newSource.onended = () => {
+            if (get().previewSource === newSource) {
+              set({ previewSource: null, previewUrl: null });
+            }
+          };
+        } else {
+          // If buffer is null, clear the preview state
+          set({ previewSource: null, previewUrl: null });
+        }
+      } catch (error) {
+        console.error(`Error previewing sample ${url}:`, error);
+        set({ previewSource: null, previewUrl: null });
+      } finally {
+        // Release the lock
+        set({ loadingPreviewUrl: null });
       }
     },
 
@@ -273,9 +314,15 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
 
       if (get().isPlaying) {
         get().stopPlayback();
-      } else {
+      }
+      else {
         get().startPlayback();
       }
+    },
+
+    handleStop: () => {
+      get().stopPlayback();
+      get().seekPlayback(0);
     },
 
     startPlayback: () => {

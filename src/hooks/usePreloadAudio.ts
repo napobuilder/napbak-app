@@ -8,16 +8,25 @@ export const usePreloadAudio = () => {
   const { loadAudioBuffer } = useAudioEngine();
 
   useEffect(() => {
-    // Pre-load audio for samples from persisted state on initial mount
-    const allSamples = tracks.flatMap(track => track.slots).filter(Boolean) as Sample[];
-    const uniqueUrls = new Set(allSamples.map(sample => sample.url));
-    
-    if (uniqueUrls.size > 0) {
-      console.log(`Pre-loading ${uniqueUrls.size} unique audio buffers from saved project...`);
-      uniqueUrls.forEach(url => {
-        loadAudioBuffer(url);
-      });
-    }
+    const preload = async () => {
+      // Pre-load audio for samples from persisted state on initial mount
+      const allSamples = tracks.flatMap(track => track.slots).filter(Boolean) as Sample[];
+      const uniqueUrls = new Set(allSamples.map(sample => sample.url));
+
+      if (uniqueUrls.size > 0) {
+        console.log(`Pre-loading ${uniqueUrls.size} unique audio buffers from saved project...`);
+        const loadPromises = Array.from(uniqueUrls).map(url => loadAudioBuffer(url));
+        
+        try {
+          await Promise.all(loadPromises);
+          console.log('All unique audio buffers pre-loaded successfully.');
+        } catch (error) {
+          console.error('An error occurred during audio pre-loading:', error);
+        }
+      }
+    };
+
+    preload();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // IMPORTANT: Runs only once after rehydration
 };

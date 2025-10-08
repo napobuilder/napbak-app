@@ -11,7 +11,7 @@ export const FileNameModal: React.FC<FileNameModalProps> = ({ isOpen, onClose, o
 
   useEffect(() => {
     if (isOpen) {
-      // Resetear el nombre cada vez que se abre
+      // Reset file name every time the modal opens
       setFileName('napbak-beat.wav');
     }
   }, [isOpen]);
@@ -28,15 +28,15 @@ export const FileNameModal: React.FC<FileNameModalProps> = ({ isOpen, onClose, o
   return (
     <div 
       className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center"
-      onClick={onClose} // Cierra el modal si se hace clic en el fondo
+      onClick={onClose} // Close modal on background click
     >
       <div 
         className="bg-[#1E1E1E] rounded-lg shadow-xl p-6 w-full max-w-md border border-[#282828]"
-        onClick={(e) => e.stopPropagation()} // Evita que el clic en el modal se propague al fondo
+        onClick={(e) => e.stopPropagation()} // Prevent modal click from propagating to background
       >
         <form onSubmit={handleSubmit}>
-          <h2 className="text-xl font-bold text-white mb-4">Nombrar tu Beat</h2>
-          <p className="text-gray-400 mb-6">Elige un nombre para tu archivo .wav.</p>
+          <h2 className="text-xl font-bold text-white mb-4">Name Your Beat</h2>
+          <p className="text-gray-400 mb-6">Choose a name for your .wav file.</p>
           <input
             type="text"
             value={fileName}
@@ -50,13 +50,13 @@ export const FileNameModal: React.FC<FileNameModalProps> = ({ isOpen, onClose, o
               onClick={onClose}
               className="py-2 px-4 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition-colors"
             >
-              Cancelar
+              Cancel
             </button>
             <button
               type="submit"
               className="py-2 px-4 bg-[#1DB954] text-white font-bold rounded-md hover:bg-green-700 transition-colors"
             >
-              Guardar
+              Export
             </button>
           </div>
         </form>

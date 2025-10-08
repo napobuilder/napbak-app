@@ -34,11 +34,19 @@ export const throttle = <T extends (...args: any[]) => void>(
 
 type ProjectPanelContent = 'save' | 'load';
 
+interface ConfirmationModalContent {
+  title: string;
+  message: string;
+}
+
 interface UIState {
   isFileNameModalOpen: boolean;
   onFileNameSubmit: ((fileName: string) => void) | null;
   isProjectPanelOpen: boolean;
   projectPanelContent: ProjectPanelContent | null;
+  isConfirmationModalOpen: boolean;
+  confirmationModalContent: ConfirmationModalContent;
+  onConfirmationSubmit: (() => void) | null;
   projectName: string | null;
   zoomLevel: number;
   activeSampleBrush: Sample | null;
@@ -46,6 +54,8 @@ interface UIState {
   isErasing: boolean;
   showFileNameModal: (onSubmit: (fileName: string) => void) => void;
   closeFileNameModal: () => void;
+  showConfirmationModal: (content: ConfirmationModalContent, onConfirm: () => void) => void;
+  closeConfirmationModal: () => void;
   openProjectPanel: (content: ProjectPanelContent) => void;
   closeProjectPanel: () => void;
   setProjectName: (name: string | null) => void;
@@ -64,6 +74,9 @@ export const useUIStore = create<UIState>((set) => ({
   onFileNameSubmit: null,
   isProjectPanelOpen: false,
   projectPanelContent: null,
+  isConfirmationModalOpen: false,
+  confirmationModalContent: { title: '', message: '' },
+  onConfirmationSubmit: null,
   projectName: null,
   zoomLevel: 1,
   activeSampleBrush: null,
@@ -78,6 +91,17 @@ export const useUIStore = create<UIState>((set) => ({
   closeFileNameModal: () => set({
     isFileNameModalOpen: false,
     onFileNameSubmit: null,
+  }),
+
+  showConfirmationModal: (content, onConfirm) => set({
+    isConfirmationModalOpen: true,
+    confirmationModalContent: content,
+    onConfirmationSubmit: onConfirm,
+  }),
+
+  closeConfirmationModal: () => set({
+    isConfirmationModalOpen: false,
+    onConfirmationSubmit: null,
   }),
 
   openProjectPanel: (content) => set({ 

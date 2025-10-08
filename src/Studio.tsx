@@ -11,17 +11,17 @@ import { Auth } from './components/Auth';
 import { SampleLibrary } from './components/SampleLibrary';
 import { Mixer } from './components/Mixer';
 import { Track } from './components/Playlist';
-import { PlaybackControls } from './components/PlaybackControls';
 import { FileNameModal } from './components/FileNameModal';
+import { ConfirmationModal } from './components/ConfirmationModal'; // Importar ConfirmationModal
 import { AddBarsButton } from './components/AddBarsButton';
 import { ZoomControls } from './components/ZoomControls';
 import { TimelineRuler } from './components/TimelineRuler';
 import { Playhead } from './components/Playhead';
-import { TimeDisplay } from './components/TimeDisplay';
 import { SongOverview } from './components/SongOverview';
 import { ProjectPanel } from './components/ProjectPanel';
 import { SaveProjectView } from './components/SaveProjectView';
 import { LoadProjectView } from './components/LoadProjectView';
+import { TopBar } from './components/TopBar';
 import { usePreloadAudio } from './hooks/usePreloadAudio';
 import { useGlobalMouseUp } from './hooks/useGlobalMouseUp';
 
@@ -76,7 +76,16 @@ const NewTrackDropZone: React.FC<NewTrackDropZoneProps> = ({ onDrop }) => {
 const Studio = () => {
   const { session } = useAuthStore();
   const { tracks, numSlots, loadProject, resetProject } = useTrackStore();
-  const { init, isPlaying, playbackTime, isExporting, loadAudioBuffer, handlePlayPause, handleExport } = useAudioEngine();
+  const { 
+    init, 
+    isPlaying, 
+    playbackTime, 
+    isExporting, 
+    loadAudioBuffer, 
+    handlePlayPause, 
+    handleStop, 
+    handleExport 
+  } = useAudioEngine();
   const { 
     isFileNameModalOpen, 
     closeFileNameModal, 
@@ -87,6 +96,11 @@ const Studio = () => {
     setProjectName,
     openProjectPanel,
     closeProjectPanel,
+    isConfirmationModalOpen,
+    confirmationModalContent,
+    onConfirmationSubmit,
+    showConfirmationModal,
+    closeConfirmationModal,
     zoomIn, 
     zoomOut,
   } = useUIStore();
@@ -121,7 +135,8 @@ const Studio = () => {
       closeProjectPanel();
     } catch (error: any) {
       toast.error(`Error saving project: ${error.message}`);
-    } finally {
+    }
+    finally {
       setIsSaving(false);
     }
   };
@@ -148,11 +163,17 @@ const Studio = () => {
   };
 
   const handleNewProject = () => {
-    if (window.confirm('Are you sure you want to start a new project? All unsaved changes will be lost.')) {
-      resetProject();
-      setProjectName(null);
-      toast.success('New project started.');
-    }
+    showConfirmationModal(
+      {
+        title: 'Start New Project',
+        message: 'Are you sure you want to start a new project? All unsaved changes will be lost.',
+      },
+      () => {
+        resetProject();
+        setProjectName(null);
+        toast.success('New project started.');
+      }
+    );
   };
 
   const handleSaveClick = () => {
@@ -207,92 +228,67 @@ const Studio = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#121212] font-sans text-white p-6 flex flex-col">
+    <div className="min-h-screen bg-[#121212] font-sans text-white flex flex-col">
       <Toaster richColors />
-      <header className="flex justify-between items-center border-b border-[#282828] pb-4 flex-shrink-0">
-        <div className="flex items-center gap-4">
-          <img src="/napbak app.png" alt="Napbak Logo" className="h-10 w-auto" />
-          <button 
-            onClick={handleNewProject}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200"
-          >
-            New Project
-          </button>
-          <button 
-            onClick={handleSaveClick}
-            className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200"
-          >
-            Save Project
-          </button>
-          <button 
-            onClick={() => openProjectPanel('save')}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200"
-          >
-            Save As...
-          </button>
-          <button 
-            onClick={() => openProjectPanel('load')}
-            className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200"
-          >
-            Load Projects
-          </button>
-        </div>
-        <div className="text-right">
-          <h1 className="text-xl font-bold truncate">{projectName || 'Untitled Project'}</h1>
-          <p className="text-[#b3b3b3] text-lg m-0">BPM: {BPM}</p>
-        </div>
-      </header>
+      
+      <TopBar 
+        isPlaying={isPlaying}
+        isExporting={isExporting}
+        projectName={projectName}
+        playbackTime={playbackTime}
+        onPlayPause={handlePlayPause}
+        onStop={handleStop}
+        onExport={handleExport}
+        onNew={handleNewProject}
+        onSave={handleSaveClick}
+        onLoad={() => openProjectPanel('load')}
+      />
 
-      <div className="pt-4 pb-2">
-        <SongOverview />
-      </div>
-
-      <div className="flex flex-row flex-1 gap-6 pt-6 min-h-0">
-        <div className="w-80 flex-shrink-0">
-          <SampleLibrary />
+      <main className="flex-1 flex flex-col p-6 gap-6 min-h-0">
+        <div className="pb-2">
+          <SongOverview />
         </div>
 
-        <div className="flex-shrink-0 flex flex-col gap-2.5">
-          <div className="h-6" />
-          <Mixer />
-        </div>
+        <div className="flex flex-row flex-1 gap-6 min-h-0">
+          <div className="w-80 flex-shrink-0">
+            <SampleLibrary />
+          </div>
 
-        <div className="flex-1 flex flex-col min-w-0">
-          <div className="relative flex-1 overflow-x-auto">
-            <Playhead />
-            <div className="flex flex-col gap-2.5">
-              <TimelineRuler />
-              {tracks.map(track => (
-                <Track
-                  key={track.id}
-                  track={track}
-                  onDrop={handleDropOnExistingTrack}
-                  onClear={useTrackStore.getState().handleClear}
-                />
-              ))}
-              <div className="flex gap-2.5">
-                <div className="flex-1">
-                  <NewTrackDropZone onDrop={handleDropOnNewTrack} />
+          <div className="flex-shrink-0 flex flex-col gap-2.5">
+            <div className="h-6" />
+            <Mixer />
+          </div>
+
+          <div className="flex-1 flex flex-col min-w-0">
+            <div className="relative flex-1 overflow-x-auto">
+              <Playhead />
+              <div className="flex flex-col gap-2.5">
+                <TimelineRuler />
+                {tracks.map(track => (
+                  <Track
+                    key={track.id}
+                    track={track}
+                    onDrop={handleDropOnExistingTrack}
+                    onClear={useTrackStore.getState().handleClear}
+                  />
+                ))}
+                <div className="flex gap-2.5">
+                  <div className="flex-1">
+                    <NewTrackDropZone onDrop={handleDropOnNewTrack} />
+                  </div>
+                  <AddBarsButton />
                 </div>
-                <AddBarsButton />
+              </div>
+            </div>
+
+            <div className="border-t border-[#282828] pt-4">
+              <div className="flex justify-end items-center mt-4">
+                <ZoomControls onZoomIn={zoomIn} onZoomOut={zoomOut} />
               </div>
             </div>
           </div>
-
-          <div className="border-t border-[#282828] pt-4">
-            <div className="flex justify-between items-center mt-4">
-              <PlaybackControls
-                isPlaying={isPlaying}
-                isExporting={isExporting}
-                onPlayPause={handlePlayPause}
-                onExport={handleExport}
-              />
-              <TimeDisplay currentTime={playbackTime} />
-              <ZoomControls onZoomIn={zoomIn} onZoomOut={zoomOut} />
-            </div>
-          </div>
         </div>
-      </div>
+      </main>
       
       <FileNameModal 
         isOpen={isFileNameModalOpen}
@@ -303,6 +299,14 @@ const Studio = () => {
           }
           closeFileNameModal();
         }}
+      />
+
+      <ConfirmationModal
+        isOpen={isConfirmationModalOpen}
+        title={confirmationModalContent.title}
+        message={confirmationModalContent.message}
+        onConfirm={onConfirmationSubmit!}
+        onClose={closeConfirmationModal}
       />
 
       <ProjectPanel 
