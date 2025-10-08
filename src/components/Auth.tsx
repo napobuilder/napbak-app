@@ -1,58 +1,67 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { Toaster, toast } from 'sonner';
 
 export const Auth = () => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoginView, setIsLoginView] = useState(true);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     try {
-      setLoading(true);
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = isLoginView
+        ? await supabase.auth.signInWithPassword({ email, password })
+        : await supabase.auth.signUp({ 
+            email, 
+            password, 
+            options: {
+              emailRedirectTo: window.location.origin,
+            }
+          });
+
       if (error) throw error;
-      // The user will be redirected or the UI will update via the onAuthStateChange listener
+
+      if (!isLoginView) {
+        toast.success('Account created! Check your email to confirm your account.');
+      }
+      // For login, the onAuthStateChange listener will handle the UI update.
+
     } catch (error: any) {
-      alert(error.error_description || error.message);
+      toast.error(error.error_description || error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      setLoading(true);
-      const { error } = await supabase.auth.signUp({ email, password });
-      if (error) throw error;
-      alert('Check your email for the login link!');
-    } catch (error: any) {
-      alert(error.error_description || error.message);
-    } finally {
-      setLoading(false);
-    }
+  const toggleView = () => {
+    setIsLoginView(!isLoginView);
   };
 
   return (
     <div className="w-full max-w-md p-8 space-y-8 bg-[#181818] rounded-lg shadow-lg">
+      <Toaster richColors position="top-center" />
       <div>
-        <h2 className="text-center text-3xl font-extrabold text-white">Sign in to your account</h2>
+        <h2 className="text-center text-3xl font-extrabold text-white">
+          {isLoginView ? 'Sign in to your account' : 'Create a new account'}
+        </h2>
         <p className="mt-2 text-center text-sm text-gray-400">
           To save and load your projects
         </p>
       </div>
-      <form className="mt-8 space-y-6" onSubmit={handleLogin}>
+      <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
         <div className="rounded-md shadow-sm -space-y-px">
           <div>
-            <label htmlFor="email-address" className="sr-only">Email address</label>
+            <label htmlFor="email-address" className="sr-only">Email</label>
             <input
               id="email-address"
               name="email"
               type="email"
               autoComplete="email"
               required
-              className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
+              className="appearance-none rounded-t-md relative block w-full px-3 py-2 border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
               placeholder="Email address"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -64,9 +73,9 @@ export const Auth = () => {
               id="password"
               name="password"
               type="password"
-              autoComplete="current-password"
+              autoComplete={isLoginView ? "current-password" : "new-password"}
               required
-              className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
+              className="appearance-none rounded-b-md relative block w-full px-3 py-2 border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -74,24 +83,22 @@ export const Auth = () => {
           </div>
         </div>
 
-        <div className="flex flex-col space-y-4">
+        <div>
           <button
             type="submit"
             className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
             disabled={loading}
           >
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
-          <button
-            type="button"
-            onClick={handleSignup}
-            className="group relative w-full flex justify-center py-2 px-4 border border-gray-600 text-sm font-medium rounded-md text-gray-300 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50"
-            disabled={loading}
-          >
-            {loading ? 'Signing up...' : 'Sign Up'}
+            {loading ? 'Processing...' : (isLoginView ? 'Sign In' : 'Sign Up')}
           </button>
         </div>
       </form>
+      <p className="mt-2 text-center text-sm text-gray-400">
+        {isLoginView ? "Don't have an account?" : 'Already have an account?'}{' '}
+        <button onClick={toggleView} className="font-medium text-green-500 hover:text-green-400">
+          {isLoginView ? 'Sign up' : 'Sign in'}
+        </button>
+      </p>
     </div>
   );
 };
