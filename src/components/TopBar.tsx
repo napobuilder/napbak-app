@@ -12,6 +12,7 @@ interface TopBarProps {
     onNew: () => void;
     onSave: () => void;
     onLoad: () => void;
+    onLogout: () => void;
 }
 
 // --- Iconos SVG (sin cambios) ---
@@ -43,7 +44,8 @@ export const TopBar: React.FC<TopBarProps> = ({
     playbackTime,
     onNew,
     onSave,
-    onLoad
+    onLoad,
+    onLogout
 }) => {
     return (
         <div className="bg-gray-900 text-white p-3 flex justify-between items-center shadow-lg border-b border-gray-700">
@@ -78,14 +80,20 @@ export const TopBar: React.FC<TopBarProps> = ({
                 <TimeDisplay currentTime={playbackTime} />
             </div>
 
-            {/* Right Side: Export Action */}
-            <div className="flex-1 flex justify-end">
+            {/* Right Side: Export & Logout Actions */}
+            <div className="flex-1 flex justify-end items-center gap-4">
                 <button 
                     className={`bg-blue-500 py-2 px-6 rounded-lg font-semibold hover:bg-blue-600 transition-colors ${isExporting ? 'bg-gray-500 cursor-not-allowed' : ''}`}
                     onClick={onExport}
                     disabled={isExporting}
                 >
                     {isExporting ? 'Exporting...' : 'Export'}
+                </button>
+                <button 
+                    onClick={onLogout}
+                    className="bg-gray-700 hover:bg-red-600 text-sm font-bold py-2 px-3 rounded-md transition-colors"
+                >
+                    Logout
                 </button>
             </div>
         </div>

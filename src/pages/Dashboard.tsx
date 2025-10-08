@@ -1,14 +1,32 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useTrackStore } from '../store/useTrackStore';
+import { useAuth } from '../hooks/useAuth';
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const resetProject = useTrackStore(state => state.resetProject);
+  const { session, loading } = useAuth();
 
   const handleStartNewBeat = () => {
     resetProject(); // Limpiar el estado del proyecto anterior
     navigate('/studio');
   };
+
+  const handleGoToLogin = () => {
+    navigate('/login');
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#121212] flex justify-center items-center">
+        <p className="text-white">Loading...</p>
+      </div>
+    );
+  }
+
+  if (session) {
+    return <Navigate to="/studio" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-[#121212] font-sans text-white flex flex-col items-center justify-center p-6">
@@ -27,7 +45,7 @@ const Dashboard = () => {
 
       <div className="absolute bottom-8 text-center">
         <p className="text-[#b3b3b3]">
-          <a href="#" onClick={(e) => e.preventDefault()} className="underline hover:text-white">Sign up</a> to save and sync your projects online.
+          <button onClick={handleGoToLogin} className="underline hover:text-white font-medium">Sign up</button> to save and sync your projects online.
         </p>
       </div>
     </div>

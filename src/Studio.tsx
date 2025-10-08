@@ -2,17 +2,15 @@ import { useEffect, useState } from 'react';
 import { useTrackStore } from './store/useTrackStore';
 import { useAudioEngine } from './store/useAudioEngine';
 import { useUIStore } from './store/useUIStore';
-import { useAuthStore } from './store/useAuthStore';
 import { supabase } from './lib/supabaseClient';
 import { Toaster, toast } from 'sonner';
 import type { Sample, Project } from './types';
 
-import { Auth } from './components/Auth';
 import { SampleLibrary } from './components/SampleLibrary';
 import { Mixer } from './components/Mixer';
 import { Track } from './components/Playlist';
 import { FileNameModal } from './components/FileNameModal';
-import { ConfirmationModal } from './components/ConfirmationModal'; // Importar ConfirmationModal
+import { ConfirmationModal } from './components/ConfirmationModal';
 import { AddBarsButton } from './components/AddBarsButton';
 import { ZoomControls } from './components/ZoomControls';
 import { TimelineRuler } from './components/TimelineRuler';
@@ -24,6 +22,7 @@ import { LoadProjectView } from './components/LoadProjectView';
 import { TopBar } from './components/TopBar';
 import { usePreloadAudio } from './hooks/usePreloadAudio';
 import { useGlobalMouseUp } from './hooks/useGlobalMouseUp';
+import { useAuth } from './hooks/useAuth';
 
 // --- Componente para la Zona de Drop de Nueva Pista ---
 interface NewTrackDropZoneProps {
@@ -71,7 +70,7 @@ const NewTrackDropZone: React.FC<NewTrackDropZoneProps> = ({ onDrop }) => {
 };
 
 const Studio = () => {
-  const { session } = useAuthStore();
+  const { session } = useAuth();
   const { tracks, numSlots, loadProject, resetProject } = useTrackStore();
   const { 
     init, 
@@ -106,6 +105,15 @@ const Studio = () => {
 
   usePreloadAudio();
   useGlobalMouseUp();
+
+  const handleLogout = async () => {
+    handleStop(); // Stop audio playback before signing out
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      toast.error(`Logout failed: ${error.message}`);
+    }
+    // The onAuthStateChange listener in useAuth will handle the redirect
+  };
 
   const handleSaveProject = async (projectName: string) => {
     if (!session) {
@@ -216,14 +224,6 @@ const Studio = () => {
     useTrackStore.getState().addTrackWithSample(sample);
   };
 
-  if (!session) {
-    return (
-      <div className="min-h-screen bg-[#121212] flex items-center justify-center">
-        <Auth />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-[#121212] font-sans text-white flex flex-col">
       <Toaster richColors />
@@ -239,6 +239,7 @@ const Studio = () => {
         onNew={handleNewProject}
         onSave={handleSaveClick}
         onLoad={() => openProjectPanel('load')}
+        onLogout={handleLogout}
       />
 
       <main className="flex-1 flex flex-col p-6 gap-6 min-h-0">

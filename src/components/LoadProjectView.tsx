@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { useAuthStore } from '../store/useAuthStore';
+import { useAuth } from '../hooks/useAuth';
 import type { Project } from '../types';
 
 interface LoadProjectViewProps {
@@ -11,7 +11,7 @@ export const LoadProjectView: React.FC<LoadProjectViewProps> = ({ onLoadProject 
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { session } = useAuthStore();
+  const { session } = useAuth();
 
   useEffect(() => {
     const fetchProjects = async () => {

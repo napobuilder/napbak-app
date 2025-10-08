@@ -1,8 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
-import Studio from './Studio'; // <-- Changed from App
+import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
+import Studio from './Studio';
 import Dashboard from './pages/Dashboard';
+import { Auth } from './components/Auth';
+import ProtectedRoute from './components/ProtectedRoute';
 import './index.css';
 
 const router = createBrowserRouter([
@@ -11,8 +13,18 @@ const router = createBrowserRouter([
     element: <Dashboard />,
   },
   {
+    path: '/login',
+    element: <Auth />,
+  },
+  {
     path: '/studio',
-    element: <Studio />,
+    element: <ProtectedRoute />,
+    children: [
+      {
+        path: '',
+        element: <Studio />,
+      },
+    ],
   },
 ]);
 
