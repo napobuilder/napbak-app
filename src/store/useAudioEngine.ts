@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { useTrackStore } from './useTrackStore';
 import { useUIStore } from './useUIStore';
-import type { Sample, Track } from '../types';
+import type { Track } from '../types';
 
 const BPM = 90;
 
@@ -220,16 +220,17 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
       });
     },
 
-    setTrackVolume: (trackId, volume) => {
+    setTrackVolume: (trackId: string, volume: number) => {
       const gainNode = get().trackGainNodes[trackId];
-      if (gainNode) {
-        const now = getAudioContext().currentTime;
+      const audioContext = getAudioContext();
+      if (gainNode && audioContext) {
+        const now = audioContext.currentTime;
         gainNode.gain.cancelScheduledValues(now);
         gainNode.gain.setTargetAtTime(volume, now, 0.015);
       }
     },
 
-    loadAudioBuffer: async (url) => {
+    loadAudioBuffer: async (url: string) => {
       if (audioBuffers[url]) return audioBuffers[url];
       const audioContext = getAudioContext();
       if (!audioContext) return null;
@@ -251,7 +252,7 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
       }
     },
 
-    previewSample: async (url) => {
+    previewSample: async (url: string) => {
       const audioContext = getAudioContext();
       if (!audioContext) return;
       if (audioContext.state === 'suspended') await audioContext.resume();
@@ -363,9 +364,11 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
       set({ isPlaying: false });
     },
 
-    seekPlayback: (time) => {
+    seekPlayback: (time: number) => {
       const { isPlaying } = get();
-      const now = getAudioContext().currentTime;
+      const audioContext = getAudioContext();
+      if (!audioContext) return;
+      const now = audioContext.currentTime;
       
       playbackStartTime = now - time;
       set({ playbackTime: time });
@@ -378,17 +381,35 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
     handleExport: () => {
       const { showFileNameModal } = useUIStore.getState();
       showFileNameModal(async (fileName) => {
+        console.log("--- INICIANDO EXPORTACIÓN ---");
         set({ isExporting: true });
         try {
           const { tracks, totalDuration, numSlots } = useTrackStore.getState();
           const audioContext = getAudioContext();
+
+          console.log(`Duración total del beat: ${totalDuration} segundos.`);
+
+          if (!audioContext) {
+            console.error("Error: AudioContext no disponible para exportar.");
+            set({ isExporting: false });
+            return;
+          }
+          if (totalDuration <= 0) {
+            console.error("Error: La duración total es 0. No se puede exportar un beat vacío.");
+            set({ isExporting: false });
+            // Aquí podrías mostrar una notificación al usuario.
+            return;
+          }
+
           let finalFileName = fileName;
           if (!finalFileName) finalFileName = "napbak-beat.wav";
           if (!finalFileName.toLowerCase().endsWith('.wav')) finalFileName += '.wav';
-
-          const offlineCtx = new OfflineAudioContext(2, audioContext.sampleRate * totalDuration, audioContext.sampleRate);
+          
+          console.log("Creando OfflineAudioContext...");
+          const offlineCtx = new OfflineAudioContext(2, Math.ceil(audioContext.sampleRate * totalDuration), audioContext.sampleRate);
           const measureDuration = (60 / BPM) * 4;
 
+          console.log("Programando samples en el contexto offline...");
           for (const track of tracks) {
             let i = 0;
             while (i < numSlots) {
@@ -412,23 +433,37 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
             }
           }
 
+          console.log("Iniciando renderizado de audio...");
           const renderedBuffer = await offlineCtx.startRendering();
+          console.log("Renderizado completado.");
+
+          console.log("Convirtiendo buffer a formato WAV...");
           const wav = bufferToWav(renderedBuffer);
-          const blob = new Blob([wav], { type: 'audio/wav' });
+          const blob = new Blob([wav.buffer as ArrayBuffer], { type: 'audio/wav' });
+          console.log(`Blob WAV creado. Tamaño: ${blob.size} bytes.`);
+
+          if (blob.size <= 44) {
+             console.error("Error: El blob generado está vacío o solo contiene el encabezado WAV. La exportación ha fallado.");
+             set({ isExporting: false });
+             return;
+          }
 
           if ('showSaveFilePicker' in window) {
+            console.log("Usando API 'showSaveFilePicker' para guardar...");
             try {
-              const handle = await window.showSaveFilePicker({
+              const handle = await (window as any).showSaveFilePicker({
                 suggestedName: finalFileName,
                 types: [{ description: 'WAV file', accept: { 'audio/wav': ['.wav'] } }],
               });
               const writable = await handle.createWritable();
               await writable.write(blob);
               await writable.close();
+              console.log("Archivo guardado exitosamente con showSaveFilePicker.");
             } catch (err) {
-              console.log("Guardado cancelado por el usuario.", err);
+              console.log("Guardado cancelado por el usuario o fallido.", err);
             }
           } else {
+            console.log("Usando método de fallback (<a> tag) para descargar...");
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             document.body.appendChild(a);
@@ -438,10 +473,12 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
+            console.log("Descarga iniciada con el método de fallback.");
           }
         } catch (error) {
-          console.error("Error durante la exportación:", error);
+          console.error("Error catastrófico durante la exportación:", error);
         } finally {
+          console.log("--- FINALIZANDO EXPORTACIÓN ---");
           set({ isExporting: false });
         }
       });

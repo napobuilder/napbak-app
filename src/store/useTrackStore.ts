@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Sample, Track, TrackType } from '../types';
+import type { Sample, Track } from '../types';
 import { useAudioEngine } from './useAudioEngine';
 
 const BPM = 90;

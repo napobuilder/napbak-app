@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { useTrackStore, type TrackState } from './store/useTrackStore';
+import { useEffect, useState } from 'react';
+import { useTrackStore } from './store/useTrackStore';
 import { useAudioEngine } from './store/useAudioEngine';
 import { useUIStore } from './store/useUIStore';
 import { useAuthStore } from './store/useAuthStore';
@@ -24,9 +24,6 @@ import { LoadProjectView } from './components/LoadProjectView';
 import { TopBar } from './components/TopBar';
 import { usePreloadAudio } from './hooks/usePreloadAudio';
 import { useGlobalMouseUp } from './hooks/useGlobalMouseUp';
-
-const BASE_SLOT_WIDTH = 64;
-const BPM = 90;
 
 // --- Componente para la Zona de Drop de Nueva Pista ---
 interface NewTrackDropZoneProps {

@@ -1,4 +1,4 @@
-import type { Sample, SampleCategory, TrackType } from './types';
+import type { Sample, SampleCategory } from './types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const storageUrl = `${supabaseUrl}/storage/v1/object/public/samples`;

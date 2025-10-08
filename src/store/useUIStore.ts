@@ -11,7 +11,7 @@ export const throttle = <T extends (...args: any[]) => void>(
   limit: number
 ): ((...args: Parameters<T>) => void) => {
   let inThrottle: boolean;
-  let lastFunc: NodeJS.Timeout;
+  let lastFunc: number;
   let lastRan: number;
   return function(this: any, ...args: Parameters<T>) {
     const context = this;

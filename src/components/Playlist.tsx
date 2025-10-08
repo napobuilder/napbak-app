@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import type { Sample, Track } from '../types';
+import type { Sample, Track as TrackType } from '../types';
 import { useUIStore } from '../store/useUIStore';
 import { useTrackStore } from '../store/useTrackStore';
 
@@ -109,7 +109,7 @@ const EmptySlot: React.FC<EmptySlotProps> = ({ onDrop }) => {
 };
 
 interface TrackProps {
-    track: Track;
+    track: TrackType;
     onDrop: (trackId: string, slotIndex: number, sample: Sample) => void;
     onClear: (trackId: string, instanceId: string) => void;
 }
