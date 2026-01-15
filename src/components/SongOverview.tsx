@@ -2,9 +2,6 @@ import React from 'react';
 import { useTrackStore } from '../store/useTrackStore';
 import { useAudioEngine } from '../store/useAudioEngine';
 
-const BPM = 90;
-const MEASURE_DURATION = (60 / BPM) * 4; // Duración de un compás/slot en segundos
-
 export const SongOverview: React.FC = () => {
   const tracks = useTrackStore(state => state.tracks);
   const activeSlots = useTrackStore(state => state.activeSlots);
