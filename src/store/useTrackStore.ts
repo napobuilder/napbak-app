@@ -32,13 +32,9 @@ const calculateActiveSlots = (tracks: Track[]): number => {
 // --- Estado Inicial ---
 
 const initialNumSlots = 32;
-const initialTracks: Track[] = [
-  { id: crypto.randomUUID(), name: 'Drums', type: 'Drums', volume: 1.0, isMuted: false, isSoloed: false, slots: Array(initialNumSlots).fill(null) },
-  { id: crypto.randomUUID(), name: 'Bass', type: 'Bass', volume: 1.0, isMuted: false, isSoloed: false, slots: Array(initialNumSlots).fill(null) },
-  { id: crypto.randomUUID(), name: 'Melody', type: 'Melody', volume: 1.0, isMuted: false, isSoloed: false, slots: Array(initialNumSlots).fill(null) },
-  { id: crypto.randomUUID(), name: 'Fills', type: 'Fills', volume: 1.0, isMuted: false, isSoloed: false, slots: Array(initialNumSlots).fill(null) },
-  { id: crypto.randomUUID(), name: 'SFX', type: 'SFX', volume: 1.0, isMuted: false, isSoloed: false, slots: Array(initialNumSlots).fill(null) },
-];
+
+// Canvas vacío - el usuario crea pistas arrastrando samples
+const initialTracks: Track[] = [];
 
 const initialState = {
   tracks: initialTracks,
@@ -46,7 +42,7 @@ const initialState = {
   numSlots: initialNumSlots,
   activeSlots: MIN_LOOP_SLOTS,
   totalDuration: calculateDurationInSeconds(MIN_LOOP_SLOTS),
-  projectKey: null, // Tonalidad del proyecto
+  projectKey: null,
 };
 
 // --- Definición del Store ---
@@ -115,9 +111,10 @@ export const useTrackStore = create<TrackState>()(
         const newSlots = Array(get().numSlots).fill(null);
         newSlots[0] = { ...sample, instanceId: crypto.randomUUID() };
 
+        // Usar el nombre del sample como nombre de la pista
         const newTrack: Track = {
           id: crypto.randomUUID(),
-          name: sample.type,
+          name: sample.name, // Auto-nombrar con el nombre del sample
           type: sample.type,
           volume: 1.0,
           isMuted: false,
@@ -253,7 +250,7 @@ export const useTrackStore = create<TrackState>()(
       },
     }),
     {
-      name: 'napbak-project-v3',
+      name: 'napbak-project-v4', // v4: Canvas vacío + auto-nombre de pistas
     }
   )
 );

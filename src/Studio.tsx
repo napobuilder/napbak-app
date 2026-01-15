@@ -30,9 +30,10 @@ import LoadingScreen from './components/LoadingScreen';
 // --- Componente para la Zona de Drop de Nueva Pista ---
 interface NewTrackDropZoneProps {
   onDrop: (sample: Sample) => void;
+  isEmpty?: boolean; // Si es la primera pista (canvas vacío)
 }
 
-const NewTrackDropZone: React.FC<NewTrackDropZoneProps> = ({ onDrop }) => {
+const NewTrackDropZone: React.FC<NewTrackDropZoneProps> = ({ onDrop, isEmpty = false }) => {
   const [isOver, setIsOver] = useState(false);
   const { activeSampleBrush } = useUIStore();
 
@@ -64,6 +65,41 @@ const NewTrackDropZone: React.FC<NewTrackDropZoneProps> = ({ onDrop }) => {
     }
   };
 
+  // Estilos diferentes para canvas vacío vs agregar más pistas
+  if (isEmpty) {
+    const emptyBaseClasses = "min-h-[200px] flex flex-col items-center justify-center rounded-xl transition-all duration-300 ease-in-out touch-manipulation";
+    const emptyInactiveClasses = "bg-gradient-to-br from-[#1a1a1a] to-[#0f0f0f] border-2 border-dashed border-[#333333]";
+    const emptyActiveClasses = "bg-gradient-to-br from-[#1a2f1a] to-[#0f1f0f] border-2 border-dashed border-[#1DB954] scale-[1.02]";
+
+    return (
+      <div 
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onClick={handleTap}
+        className={`${emptyBaseClasses} ${isOver ? emptyActiveClasses : emptyInactiveClasses}`}
+      >
+        <div className="text-4xl mb-4 opacity-30">🎵</div>
+        <p className="text-white text-lg font-medium mb-2">
+          {isOver ? "¡Suéltalo aquí!" : "Empieza tu beat"}
+        </p>
+        <p className="text-[#888] text-sm text-center px-4">
+          <span className="hidden lg:inline">Arrastra un sample desde la librería</span>
+          <span className="lg:hidden">
+            {activeSampleBrush ? "Toca para agregar" : "Selecciona un sample primero"}
+          </span>
+        </p>
+        {!activeSampleBrush && (
+          <div className="mt-4 flex items-center gap-2 text-[#666] text-xs">
+            <span className="hidden lg:inline">←</span>
+            <span>Elige de la librería</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Versión compacta para agregar más pistas
   const baseClasses = "h-16 sm:h-20 flex items-center justify-center rounded-lg transition-colors duration-200 ease-in-out touch-manipulation";
   const inactiveClasses = "bg-[#181818] border-2 border-dashed border-[#333333]";
   const activeClasses = "bg-[#2a2a2a] border-2 border-dashed border-[#1DB954]";
@@ -79,10 +115,10 @@ const NewTrackDropZone: React.FC<NewTrackDropZoneProps> = ({ onDrop }) => {
     >
       <p className="text-[#b3b3b3] text-xs sm:text-sm text-center px-2">
         {activeSampleBrush 
-          ? <span className="lg:hidden">Tap to add new track</span>
-          : <span className="lg:hidden">Select a sample first</span>
+          ? <span className="lg:hidden">Tap para nueva pista</span>
+          : <span className="lg:hidden">Selecciona un sample</span>
         }
-        <span className="hidden lg:inline">Drag sample here to create a new track</span>
+        <span className="hidden lg:inline">+ Arrastra para nueva pista</span>
       </p>
     </div>
   );
@@ -317,9 +353,9 @@ const Studio = () => {
                 ))}
                 <div className="flex gap-2 lg:gap-2.5">
                   <div className="flex-1">
-                    <NewTrackDropZone onDrop={handleDropOnNewTrack} />
+                    <NewTrackDropZone onDrop={handleDropOnNewTrack} isEmpty={tracks.length === 0} />
                   </div>
-                  <AddBarsButton />
+                  {tracks.length > 0 && <AddBarsButton />}
                 </div>
               </div>
             </div>
