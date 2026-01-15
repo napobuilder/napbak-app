@@ -2,11 +2,12 @@ export interface Sample {
   id: string;
   name: string;
   url: string;
-  type: TrackType; // <-- Added this property
+  type: TrackType;
   duration: number;
   color: string;
   offset?: number;
   instanceId?: string;
+  key?: string; // Tonalidad musical (ej: "Fm", "C#m", "Gmaj")
 }
 
 export interface Track {
