@@ -5,6 +5,8 @@ import Studio from './Studio';
 import Dashboard from './pages/Dashboard';
 import { Auth } from './components/Auth';
 import ProtectedRoute from './components/ProtectedRoute';
+import FounderPage from './pages/FounderPage';
+import PaymentStatusPage from './pages/PaymentStatusPage';
 import './index.css';
 
 const router = createBrowserRouter([
@@ -25,6 +27,14 @@ const router = createBrowserRouter([
         element: <Studio />,
       },
     ],
+  },
+  {
+    path: '/founder',
+    element: <FounderPage />,
+  },
+  {
+    path: '/payment-status',
+    element: <PaymentStatusPage />,
   },
 ]);
 

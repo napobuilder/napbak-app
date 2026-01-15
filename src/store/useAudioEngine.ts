@@ -1,7 +1,9 @@
 import { create } from 'zustand';
+import * as Tone from 'tone';
 import { useTrackStore } from './useTrackStore';
 import { useUIStore } from './useUIStore';
 import type { Track } from '../types';
+import { getPitchShiftInSemitones } from '../lib/tonal';
 
 const BPM = 90;
 
@@ -25,7 +27,7 @@ interface AudioEngineState {
   isPlaying: boolean;
   playbackTime: number;
   isExporting: boolean;
-  previewSource: AudioBufferSourceNode | null;
+  previewSource: Tone.Player | null;
   previewUrl: string | null;
   loadingPreviewUrl: string | null; // Lock to prevent race conditions
   trackGainNodes: { [key: string]: GainNode | null };
@@ -44,10 +46,13 @@ interface AudioEngineState {
 }
 
 const audioBuffers: { [key: string]: AudioBuffer } = {};
-let playingSources: AudioBufferSourceNode[] = [];
+let playingSources: (Tone.Player | AudioBufferSourceNode)[] = [];
 let animationFrameId: number | null = null;
 let playbackStartTime = 0;
 
+// --- SCHEDULING LOGIC (OLD vs NEW) ---
+
+// V1: Simple detune (changes BPM)
 const scheduleTrack = (
   track: Track,
   currentTime: number,
@@ -55,7 +60,8 @@ const scheduleTrack = (
   measureDuration: number,
   numSlots: number,
   trackGainNode: GainNode,
-  totalDuration: number
+  totalDuration: number,
+  projectKey: string | null // <-- NEW: Project key for tuning
 ) => {
   const newSources: AudioBufferSourceNode[] = [];
   const loopedElapsedTime = totalDuration > 0 ? elapsedTime % totalDuration : elapsedTime;
@@ -72,11 +78,22 @@ const scheduleTrack = (
         const audioContext = getAudioContext();
         if (!audioContext) return [];
 
+        const source = audioContext.createBufferSource();
+        source.buffer = audioBuffer;
+
+        // --- PITCH SHIFTING LOGIC ---
+        if (sample.type === 'Melody' && sample.key && projectKey) {
+          const semitones = getPitchShiftInSemitones(sample.key, projectKey);
+          if (source.detune) {
+            source.detune.value = semitones * 100; // detune is in cents
+          }
+        }
+        // --- END PITCH SHIFTING ---
+
+        source.connect(trackGainNode);
+
         // Case 1: The sample is completely in the future (relative to the looped time)
         if (sampleStartTimeInSeconds >= loopedElapsedTime) {
-          const source = audioContext.createBufferSource();
-          source.buffer = audioBuffer;
-          source.connect(trackGainNode);
           const startOffset = sampleStartTimeInSeconds - loopedElapsedTime;
           source.start(currentTime + startOffset, 0, sampleDurationInSeconds);
           newSources.push(source);
@@ -85,9 +102,6 @@ const scheduleTrack = (
         else if (sampleEndTimeInSeconds > loopedElapsedTime) {
           const offset = loopedElapsedTime - sampleStartTimeInSeconds;
           const remainingDuration = sampleDurationInSeconds - offset;
-          const source = audioContext.createBufferSource();
-          source.buffer = audioBuffer;
-          source.connect(trackGainNode);
           // Start immediately from the calculated offset and for the remaining duration
           source.start(currentTime, offset, remainingDuration);
           newSources.push(source);
@@ -102,13 +116,68 @@ const scheduleTrack = (
   return newSources;
 };
 
-export const useAudioEngine = create<AudioEngineState>((set, get) => {
-  const schedulePlayback = () => {
-    // Detener todas las fuentes previamente programadas para limpiar la línea de tiempo
-    playingSources.forEach(source => { try { source.stop(); } catch {} });
+// V2: Tone.js PitchShift (preserves BPM)
+const scheduleTrackWithPitchShift = async (
+  track: Track,
+  currentTime: number,
+  elapsedTime: number,
+  measureDuration: number,
+  numSlots: number,
+  trackGainNode: GainNode,
+  totalDuration: number,
+  projectKey: string | null
+) => {
+  const newSources: Tone.Player[] = [];
+  const loopedElapsedTime = totalDuration > 0 ? elapsedTime % totalDuration : elapsedTime;
 
-    const { tracks, numSlots, soloedTrackId, totalDuration } = useTrackStore.getState();
-    let newSources: AudioBufferSourceNode[] = [];
+  for (let i = 0; i < numSlots; ) {
+    const sample = track.slots[i];
+    if (sample && audioBuffers[sample.url]) {
+      const audioBuffer = audioBuffers[sample.url];
+      const sampleDurationInSeconds = (sample.duration || 1) * measureDuration;
+      const sampleStartTimeInSeconds = (i + (sample.offset || 0)) * measureDuration;
+      const sampleEndTimeInSeconds = sampleStartTimeInSeconds + sampleDurationInSeconds;
+
+      let semitones = 0;
+      if (sample.type === 'Melody' && sample.key && projectKey) {
+        semitones = getPitchShiftInSemitones(sample.key, projectKey);
+      }
+
+      const player = new Tone.Player(audioBuffer);
+      const pitchShift = new Tone.PitchShift({ pitch: semitones }).connect(trackGainNode);
+      player.connect(pitchShift);
+
+      if (sampleStartTimeInSeconds >= loopedElapsedTime) {
+        const startOffset = sampleStartTimeInSeconds - loopedElapsedTime;
+        player.start(currentTime + startOffset, 0, sampleDurationInSeconds);
+        newSources.push(player);
+      } else if (sampleEndTimeInSeconds > loopedElapsedTime) {
+        const offset = loopedElapsedTime - sampleStartTimeInSeconds;
+        const remainingDuration = sampleDurationInSeconds - offset;
+        player.start(currentTime, offset, remainingDuration);
+        newSources.push(player);
+      }
+      i += sample.duration || 1;
+    } else {
+      i++;
+    }
+  }
+  return newSources;
+};
+
+export const useAudioEngine = create<AudioEngineState>((set, get) => {
+  const schedulePlayback = async () => {
+    playingSources.forEach(source => { 
+      try { 
+        source.stop(); 
+        (source as any).dispose?.(); 
+      } catch {} 
+    });
+
+    const { tracks, numSlots, soloedTrackId, totalDuration, projectKey } = useTrackStore.getState();
+    const PITCH_SHIFT_ENABLED = false; // <-- SAFETY SWITCH
+
+    let newSources: (AudioBufferSourceNode | Tone.Player)[] = [];
     const measureDuration = (60 / BPM) * 4;
     const audioContext = getAudioContext();
     if (!audioContext) return;
@@ -119,22 +188,16 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
       const trackGainNode = get().trackGainNodes[track.id];
       if (!trackGainNode) continue;
 
-      // Lógica de Solo/Mute
       const isMuted = track.isMuted;
       const anotherTrackIsSoloed = soloedTrackId !== null && soloedTrackId !== track.id;
-      if (isMuted || anotherTrackIsSoloed) {
-        continue; // Saltar la programación de esta pista
-      }
+      if (isMuted || anotherTrackIsSoloed) continue;
 
-      const trackSources = scheduleTrack(
-        track,
-        currentTime,
-        elapsedTime,
-        measureDuration,
-        numSlots,
-        trackGainNode,
-        totalDuration
-      );
+      let trackSources: (AudioBufferSourceNode | Tone.Player)[] = [];
+      if (PITCH_SHIFT_ENABLED && track.type === 'Melody') {
+        trackSources = await scheduleTrackWithPitchShift(track, currentTime, elapsedTime, measureDuration, numSlots, trackGainNode, totalDuration, projectKey);
+      } else {
+        trackSources = scheduleTrack(track, currentTime, elapsedTime, measureDuration, numSlots, trackGainNode, totalDuration, projectKey);
+      }
       newSources = newSources.concat(trackSources);
     }
     playingSources = newSources;
@@ -178,7 +241,6 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
     },
 
     subscribeToTrackStore: () => {
-      // This subscription ensures gain nodes are always in sync with the tracks state.
       useTrackStore.subscribe((state, prevState) => {
         const audioContext = getAudioContext();
         if (!audioContext) return;
@@ -187,10 +249,8 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
         const newGainNodes = { ...get().trackGainNodes };
         let gainNodesChanged = false;
 
-        // Create gain nodes for new tracks (including on initial hydration)
         for (const track of state.tracks) {
           if (!newGainNodes[track.id]) {
-            console.log(`Audio engine: Creating and connecting gain node for track ${track.id}`);
             const gainNode = audioContext.createGain();
             gainNode.gain.setValueAtTime(track.volume, audioContext.currentTime);
             gainNode.connect(audioContext.destination);
@@ -199,10 +259,8 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
           }
         }
 
-        // Disconnect and remove gain nodes for deleted tracks
         for (const trackId in newGainNodes) {
           if (!currentTrackIds.has(trackId)) {
-            console.log(`Audio engine: Disconnecting and removing gain node for track ${trackId}`);
             newGainNodes[trackId]?.disconnect();
             delete newGainNodes[trackId];
             gainNodesChanged = true;
@@ -213,8 +271,7 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
           set({ trackGainNodes: newGainNodes });
         }
 
-        // If playback is active and tracks/slots have changed, reschedule audio
-        if (get().isPlaying && state.tracks !== prevState.tracks) {
+        if (get().isPlaying && (state.tracks !== prevState.tracks || state.projectKey !== prevState.projectKey)) {
           schedulePlayback();
         }
       });
@@ -235,7 +292,6 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
       const audioContext = getAudioContext();
       if (!audioContext) return null;
 
-      // Ensure the audio context is active before decoding
       if (audioContext.state === 'suspended') {
         await audioContext.resume();
       }
@@ -259,51 +315,43 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
 
       const { previewSource, previewUrl, loadingPreviewUrl } = get();
 
-      // If we are already loading a sample, ignore subsequent clicks.
       if (loadingPreviewUrl) {
         return;
       }
 
-      // Stop any currently playing sample.
       if (previewSource) {
-        previewSource.onended = null; // Avoid race conditions with the onended handler
         previewSource.stop();
+        previewSource.dispose();
       }
 
-      // If the click is on the currently playing sample, just stop it (toggle off).
       if (previewUrl === url) {
         set({ previewSource: null, previewUrl: null });
         return;
       }
 
       try {
-        // Set the lock
         set({ loadingPreviewUrl: url });
-
+        await Tone.start(); // Ensure Tone.js is ready
         const audioBuffer = await get().loadAudioBuffer(url);
 
         if (audioBuffer) {
-          const newSource = audioContext.createBufferSource();
-          newSource.buffer = audioBuffer;
-          newSource.connect(audioContext.destination);
-          newSource.start(0);
+          const player = new Tone.Player(audioBuffer).toDestination();
+          player.start();
 
-          set({ previewSource: newSource, previewUrl: url });
+          set({ previewSource: player, previewUrl: url });
 
-          newSource.onended = () => {
-            if (get().previewSource === newSource) {
+          player.onstop = () => {
+            if (get().previewSource === player) {
               set({ previewSource: null, previewUrl: null });
             }
           };
         } else {
-          // If buffer is null, clear the preview state
           set({ previewSource: null, previewUrl: null });
         }
       } catch (error) {
         console.error(`Error previewing sample ${url}:`, error);
         set({ previewSource: null, previewUrl: null });
       } finally {
-        // Release the lock
         set({ loadingPreviewUrl: null });
       }
     },
@@ -336,19 +384,17 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
       schedulePlayback();
 
       const updateProgress = () => {
-        const { totalDuration } = useTrackStore.getState(); // Obtener el valor más reciente en cada frame
+        const { totalDuration } = useTrackStore.getState();
         const now = audioContext.currentTime;
         let elapsedTime = now - playbackStartTime;
 
-        // Detect loop and reschedule audio
         if (totalDuration > 0 && elapsedTime >= totalDuration) {
           const overshoot = elapsedTime - totalDuration;
-          playbackStartTime = now - overshoot; // Reset time base for next loop
-          elapsedTime = overshoot; // The new elapsed time is the overshoot
+          playbackStartTime = now - overshoot;
+          elapsedTime = overshoot;
           schedulePlayback();
         }
         
-        // Always set a looped time for the UI
         const loopedTime = totalDuration > 0 ? elapsedTime % totalDuration : 0;
         set({ playbackTime: loopedTime });
 
@@ -358,7 +404,12 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
     },
 
     stopPlayback: () => {
-      playingSources.forEach(source => { try { source.stop(); } catch {} });
+      playingSources.forEach(source => { 
+        try { 
+          source.stop(); 
+          (source as any).dispose?.(); 
+        } catch {} 
+      });
       playingSources = [];
       if (animationFrameId) cancelAnimationFrame(animationFrameId);
       set({ isPlaying: false });
@@ -381,35 +432,23 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
     handleExport: () => {
       const { showFileNameModal } = useUIStore.getState();
       showFileNameModal(async (fileName) => {
-        console.log("--- INICIANDO EXPORTACIÓN ---");
         set({ isExporting: true });
         try {
-          const { tracks, totalDuration, numSlots } = useTrackStore.getState();
+          const { tracks, totalDuration, numSlots, projectKey } = useTrackStore.getState();
           const audioContext = getAudioContext();
 
-          console.log(`Duración total del beat: ${totalDuration} segundos.`);
-
-          if (!audioContext) {
-            console.error("Error: AudioContext no disponible para exportar.");
+          if (!audioContext || totalDuration <= 0) {
+            console.error("AudioContext not ready or nothing to export.");
             set({ isExporting: false });
             return;
           }
-          if (totalDuration <= 0) {
-            console.error("Error: La duración total es 0. No se puede exportar un beat vacío.");
-            set({ isExporting: false });
-            // Aquí podrías mostrar una notificación al usuario.
-            return;
-          }
 
-          let finalFileName = fileName;
-          if (!finalFileName) finalFileName = "napbak-beat.wav";
+          let finalFileName = fileName || "napbak-beat.wav";
           if (!finalFileName.toLowerCase().endsWith('.wav')) finalFileName += '.wav';
           
-          console.log("Creando OfflineAudioContext...");
           const offlineCtx = new OfflineAudioContext(2, Math.ceil(audioContext.sampleRate * totalDuration), audioContext.sampleRate);
           const measureDuration = (60 / BPM) * 4;
 
-          console.log("Programando samples en el contexto offline...");
           for (const track of tracks) {
             let i = 0;
             while (i < numSlots) {
@@ -419,6 +458,16 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
                 if (audioBuffer) {
                   const source = offlineCtx.createBufferSource();
                   source.buffer = audioBuffer;
+
+                  // --- EXPORT PITCH SHIFTING ---
+                  if (sample.type === 'Melody' && sample.key && projectKey) {
+                    const semitones = getPitchShiftInSemitones(sample.key, projectKey);
+                    if (source.detune) {
+                      source.detune.value = semitones * 100;
+                    }
+                  }
+                  // --- END PITCH SHIFTING ---
+
                   const gainNode = offlineCtx.createGain();
                   gainNode.gain.value = track.volume;
                   source.connect(gainNode).connect(offlineCtx.destination);
@@ -433,23 +482,17 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
             }
           }
 
-          console.log("Iniciando renderizado de audio...");
           const renderedBuffer = await offlineCtx.startRendering();
-          console.log("Renderizado completado.");
-
-          console.log("Convirtiendo buffer a formato WAV...");
           const wav = bufferToWav(renderedBuffer);
           const blob = new Blob([wav.buffer as ArrayBuffer], { type: 'audio/wav' });
-          console.log(`Blob WAV creado. Tamaño: ${blob.size} bytes.`);
 
           if (blob.size <= 44) {
-             console.error("Error: El blob generado está vacío o solo contiene el encabezado WAV. La exportación ha fallado.");
+             console.error("Export failed: resulting file is empty.");
              set({ isExporting: false });
              return;
           }
 
           if ('showSaveFilePicker' in window) {
-            console.log("Usando API 'showSaveFilePicker' para guardar...");
             try {
               const handle = await (window as any).showSaveFilePicker({
                 suggestedName: finalFileName,
@@ -458,12 +501,10 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
               const writable = await handle.createWritable();
               await writable.write(blob);
               await writable.close();
-              console.log("Archivo guardado exitosamente con showSaveFilePicker.");
             } catch (err) {
-              console.log("Guardado cancelado por el usuario o fallido.", err);
+              console.log("Save dialog cancelled by user.", err);
             }
           } else {
-            console.log("Usando método de fallback (<a> tag) para descargar...");
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             document.body.appendChild(a);
@@ -473,12 +514,10 @@ export const useAudioEngine = create<AudioEngineState>((set, get) => {
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
-            console.log("Descarga iniciada con el método de fallback.");
           }
         } catch (error) {
-          console.error("Error catastrófico durante la exportación:", error);
+          console.error("Catastrophic error during export:", error);
         } finally {
-          console.log("--- FINALIZANDO EXPORTACIÓN ---");
           set({ isExporting: false });
         }
       });

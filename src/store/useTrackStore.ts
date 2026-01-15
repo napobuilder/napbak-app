@@ -45,7 +45,8 @@ const initialState = {
   soloedTrackId: null,
   numSlots: initialNumSlots,
   activeSlots: MIN_LOOP_SLOTS,
-  totalDuration: calculateDurationInSeconds(MIN_LOOP_SLOTS), // Inicia con el loop mínimo
+  totalDuration: calculateDurationInSeconds(MIN_LOOP_SLOTS),
+  projectKey: null, // Tonalidad del proyecto
 };
 
 // --- Definición del Store ---
@@ -56,6 +57,8 @@ export interface TrackState {
   totalDuration: number;
   numSlots: number;
   activeSlots: number;
+  projectKey: string | null;
+  setProjectKey: (key: string) => void;
   addTrack: () => void;
   addTrackWithSample: (sample: Sample) => void;
   removeTrack: (trackId: string) => void;
@@ -75,6 +78,12 @@ export const useTrackStore = create<TrackState>()(
   persist(
     (set, get) => ({
       ...initialState,
+
+      setProjectKey: (key) => {
+        if (get().projectKey === null) {
+          set({ projectKey: key });
+        }
+      },
 
       loadProject: (projectData) => {
         set(projectData);
@@ -180,15 +189,17 @@ export const useTrackStore = create<TrackState>()(
       },
 
       resetProject: () => {
-        set(initialState);
+        set({...initialState, projectKey: null });
         get().updateTotalDuration();
       },
 
       handleDrop: (trackId, slotIndex, sample) => {
-        // Get the functions we'll need
-        const { addSlots, updateTotalDuration } = get();
+        const { addSlots, updateTotalDuration, setProjectKey } = get();
         
-        // --- Step 1: Check if we need to expand the playlist BEFORE doing anything else ---
+        if (sample.type === 'Melody' && sample.key) {
+          setProjectKey(sample.key);
+        }
+
         const initialNumSlots = get().numSlots;
         const duration = sample.duration || 1;
         const endPosition = slotIndex + duration;
@@ -199,13 +210,10 @@ export const useTrackStore = create<TrackState>()(
           addSlots(neededSlots + SLOTS_TO_ADD);
         }
 
-        // --- Step 2: Now that slots are (potentially) added, get the FINAL state ---
         const { tracks } = get();
         const targetTrack = tracks.find(t => t.id === trackId);
         if (!targetTrack) return;
 
-        // --- Step 3: Perform validation and placement on the final state ---
-        // Check for overlap
         for (let i = 0; i < duration; i++) {
           if (targetTrack.slots[slotIndex + i]) {
             console.warn("No se puede colocar el sample aquí, hay un solapamiento.");
@@ -213,7 +221,6 @@ export const useTrackStore = create<TrackState>()(
           }
         }
 
-        // Place the sample
         set({
           tracks: tracks.map(t => {
             if (t.id === trackId) {
@@ -246,8 +253,7 @@ export const useTrackStore = create<TrackState>()(
       },
     }),
     {
-      name: 'napbak-project-v3', // Mantener el nombre para la compatibilidad
-      // Ya no filtramos `totalDuration`, se guardará con el resto del proyecto.
+      name: 'napbak-project-v3',
     }
   )
 );

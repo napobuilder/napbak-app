@@ -1,14 +1,17 @@
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useTrackStore } from '../store/useTrackStore';
+import { useLoaderStore } from '../store/useLoaderStore';
 import { useAuth } from '../hooks/useAuth';
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const resetProject = useTrackStore(state => state.resetProject);
+  const startPreload = useLoaderStore(state => state.startPreload);
   const { session, loading } = useAuth();
 
   const handleStartNewBeat = () => {
     resetProject(); // Limpiar el estado del proyecto anterior
+    startPreload(); // Iniciar la precarga de audio
     navigate('/studio');
   };
 

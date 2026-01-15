@@ -1,32 +1,68 @@
-import { useEffect } from 'react';
-import { useTrackStore } from '../store/useTrackStore';
+import { useState, useEffect, useRef } from 'react';
+import * as Tone from 'tone';
 import { useAudioEngine } from '../store/useAudioEngine';
-import type { Sample } from '../types';
+import { SAMPLES } from '../data';
 
 export const usePreloadAudio = () => {
-  const { tracks } = useTrackStore();
-  const { loadAudioBuffer } = useAudioEngine();
+  const [isLoading, setIsLoading] = useState(true); // Empieza en true para mostrar pantalla de carga
+  const [progress, setProgress] = useState(0);
+  const hasStarted = useRef(false);
+  const { loadAudioBuffer } = useAudioEngine.getState();
 
   useEffect(() => {
-    const preload = async () => {
-      // Pre-load audio for samples from persisted state on initial mount
-      const allSamples = tracks.flatMap(track => track.slots).filter(Boolean) as Sample[];
-      const uniqueUrls = new Set(allSamples.map(sample => sample.url));
+    // Solo ejecutar una vez
+    if (hasStarted.current) return;
+    hasStarted.current = true;
 
-      if (uniqueUrls.size > 0) {
-        console.log(`Pre-loading ${uniqueUrls.size} unique audio buffers from saved project...`);
-        const loadPromises = Array.from(uniqueUrls).map(url => loadAudioBuffer(url));
-        
+    const preloadAudio = async () => {
+      const allSamples = Object.values(SAMPLES).flat();
+      const uniqueUrls = Array.from(new Set(allSamples.map(sample => sample.url)));
+      const totalSamples = uniqueUrls.length;
+
+      if (totalSamples === 0) {
+        setIsLoading(false);
+        return;
+      }
+
+      // Iniciar Tone.js (requiere gesto de usuario, pero el clic en Dashboard ya lo hizo)
+      try {
+        await Tone.start();
+      } catch (e) {
+        console.warn('Tone.js start warning:', e);
+      }
+      
+      console.log(`Pre-loading ${totalSamples} unique audio buffers...`);
+
+      let loadedCount = 0;
+      
+      // Cargar samples en paralelo con actualización de progreso
+      const loadPromises = uniqueUrls.map(async (url) => {
         try {
-          await Promise.all(loadPromises);
-          console.log('All unique audio buffers pre-loaded successfully.');
+          await loadAudioBuffer(url);
         } catch (error) {
-          console.error('An error occurred during audio pre-loading:', error);
+          console.error(`Failed to load sample: ${url}`, error);
+        } finally {
+          loadedCount++;
+          const newProgress = (loadedCount / totalSamples) * 100;
+          setProgress(newProgress);
         }
+      });
+
+      try {
+        await Promise.all(loadPromises);
+        console.log('All audio buffers pre-loaded successfully.');
+      } catch (error) {
+        console.error('Error during audio pre-loading:', error);
+      } finally {
+        // Pequeña pausa para que la animación de 100% sea visible
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 600);
       }
     };
 
-    preload();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // IMPORTANT: Runs only once after rehydration
+    preloadAudio();
+  }, [loadAudioBuffer]);
+
+  return { isLoading, progress };
 };

@@ -24,7 +24,7 @@ export const SongOverview: React.FC = () => {
 
   return (
     <div 
-      className="relative bg-[#181818] rounded-lg p-2 cursor-pointer h-24"
+      className="relative bg-[#181818] rounded-lg p-2 cursor-pointer h-16 sm:h-20 lg:h-24 touch-manipulation"
       onClick={handleSeek}
     >
       <div className="relative w-full h-full flex flex-col gap-1">

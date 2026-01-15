@@ -41,7 +41,7 @@ export const ChannelStrip: React.FC<ChannelStripProps> = ({
   };
 
   return (
-    <div className="flex flex-col items-center justify-center gap-3 p-2 bg-[#121212] rounded-lg w-24">
+    <div className="flex flex-col items-center justify-center gap-2 lg:gap-3 p-2 bg-[#121212] rounded-lg w-20 lg:w-24 flex-shrink-0">
       {isEditing ? (
         <input
           type="text"
@@ -50,12 +50,13 @@ export const ChannelStrip: React.FC<ChannelStripProps> = ({
           onBlur={handleNameBlur}
           onKeyDown={handleKeyDown}
           autoFocus
-          className="bg-[#282828] text-white text-center w-full border-none rounded-sm text-sm"
+          className="bg-[#282828] text-white text-center w-full border-none rounded-sm text-xs lg:text-sm"
         />
       ) : (
         <p 
-          className="text-white font-bold m-0 text-sm truncate w-full text-center cursor-pointer"
+          className="text-white font-bold m-0 text-xs lg:text-sm truncate w-full text-center cursor-pointer"
           onDoubleClick={() => setIsEditing(true)}
+          title="Double-click to rename"
         >
           {track.name}
         </p>

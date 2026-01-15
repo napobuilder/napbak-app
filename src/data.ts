@@ -19,12 +19,12 @@ export const SAMPLES: Record<SampleCategory, Sample[]> = {
     { id: 'b3', name: 'Analog Sub', url: `${storageUrl}/bass/ULY_KIT7_90_bass_synth_analog_Asmin.wav`, type: 'Bass', duration: 4, color: '#3a86ff' },
   ],
   melody: [
-    { id: 'm1', name: 'Piano Loop (8 measures)', url: `${storageUrl}/melodies/ORBIT_ERA_90_chord_piano_loop_vintage_creeper_F-sharp-min.wav`, type: 'Melody', duration: 4, color: '#ff006e' },
-    { id: 'm3', name: 'Freedom Chord', url: `${storageUrl}/melodies/OS_VC2_90_songstarter_freedom_Fm.wav`, type: 'Melody', duration: 4, color: '#e01e5a' },
-    { id: 'm4', name: 'Vintage Ochre', url: `${storageUrl}/melodies/AHA_LS_90_vintage_piano_loop_ochre.wav`, type: 'Melody', duration: 4, color: '#d90429' },
-    { id: 'm5', name: 'Fading EP (Abm)', url: `${storageUrl}/melodies/DBM_SDRNB_FADING_electric_piano_90BPM_Ab-MINOR.wav`, type: 'Melody', duration: 4, color: '#ef233c' },
-    { id: 'm6', name: 'Classy Piano (Cm)', url: `${storageUrl}/melodies/OS_SS_90_songstarter_piano_classy_Cm.wav`, type: 'Melody', duration: 4, color: '#d90429' },
-    { id: 'm7', name: 'Piano Romance (Gmaj)', url: `${storageUrl}/melodies/TC_RB_90_piano_romance_Gmaj.wav`, type: 'Melody', duration: 4, color: '#ef233c' },
+    { id: 'm1', name: 'Piano Loop (8 measures)', url: `${storageUrl}/melodies/ORBIT_ERA_90_chord_piano_loop_vintage_creeper_F-sharp-min.wav`, type: 'Melody', duration: 4, color: '#ff006e', key: 'F#m' },
+    { id: 'm3', name: 'Freedom Chord', url: `${storageUrl}/melodies/OS_VC2_90_songstarter_freedom_Fm.wav`, type: 'Melody', duration: 4, color: '#e01e5a', key: 'Fm' },
+    { id: 'm4', name: 'Vintage Ochre', url: `${storageUrl}/melodies/AHA_LS_90_vintage_piano_loop_ochre.wav`, type: 'Melody', duration: 4, color: '#d90429', key: 'Am' },
+    { id: 'm5', name: 'Fading EP (Abm)', url: `${storageUrl}/melodies/DBM_SDRNB_FADING_electric_piano_90BPM_Ab-MINOR.wav`, type: 'Melody', duration: 4, color: '#ef233c', key: 'Abm' },
+    { id: 'm6', name: 'Classy Piano (Cm)', url: `${storageUrl}/melodies/OS_SS_90_songstarter_piano_classy_Cm.wav`, type: 'Melody', duration: 4, color: '#d90429', key: 'Cm' },
+    { id: 'm7', name: 'Piano Romance (Gmaj)', url: `${storageUrl}/melodies/TC_RB_90_piano_romance_Gmaj.wav`, type: 'Melody', duration: 4, color: '#ef233c', key: 'Gmaj' },
   ],
   fills: [
     { id: 'f1', name: 'Beatdown', url: `${storageUrl}/fills/BEATDOWNS_drum_fill_029_90.wav`, type: 'Fills', duration: 1, color: '#8338ec', offset: 0.445 },

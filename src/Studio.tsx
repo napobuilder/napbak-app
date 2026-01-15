@@ -8,6 +8,8 @@ import type { Sample, Project } from './types';
 
 import { SampleLibrary } from './components/SampleLibrary';
 import { Mixer } from './components/Mixer';
+import { MobileMixerPanel } from './components/MobileMixerPanel';
+import { MobileDrawer } from './components/MobileDrawer';
 import { Track } from './components/Playlist';
 import { FileNameModal } from './components/FileNameModal';
 import { ConfirmationModal } from './components/ConfirmationModal';
@@ -23,6 +25,7 @@ import { TopBar } from './components/TopBar';
 import { usePreloadAudio } from './hooks/usePreloadAudio';
 import { useGlobalMouseUp } from './hooks/useGlobalMouseUp';
 import { useAuth } from './hooks/useAuth';
+import LoadingScreen from './components/LoadingScreen';
 
 // --- Componente para la Zona de Drop de Nueva Pista ---
 interface NewTrackDropZoneProps {
@@ -31,6 +34,7 @@ interface NewTrackDropZoneProps {
 
 const NewTrackDropZone: React.FC<NewTrackDropZoneProps> = ({ onDrop }) => {
   const [isOver, setIsOver] = useState(false);
+  const { activeSampleBrush } = useUIStore();
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -53,18 +57,33 @@ const NewTrackDropZone: React.FC<NewTrackDropZoneProps> = ({ onDrop }) => {
     }
   };
 
-  const baseClasses = "h-20 flex items-center justify-center rounded-lg transition-colors duration-200 ease-in-out";
+  // Mobile: tap to add with active brush
+  const handleTap = () => {
+    if (activeSampleBrush) {
+      onDrop(activeSampleBrush);
+    }
+  };
+
+  const baseClasses = "h-16 sm:h-20 flex items-center justify-center rounded-lg transition-colors duration-200 ease-in-out touch-manipulation";
   const inactiveClasses = "bg-[#181818] border-2 border-dashed border-[#333333]";
   const activeClasses = "bg-[#2a2a2a] border-2 border-dashed border-[#1DB954]";
+  const hasBrushClasses = activeSampleBrush ? "cursor-copy hover:border-blue-500" : "";
 
   return (
     <div 
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`${baseClasses} ${isOver ? activeClasses : inactiveClasses}`}
+      onClick={handleTap}
+      className={`${baseClasses} ${isOver ? activeClasses : inactiveClasses} ${hasBrushClasses}`}
     >
-      <p className="text-[#b3b3b3]">Drag sample here to create a new track</p>
+      <p className="text-[#b3b3b3] text-xs sm:text-sm text-center px-2">
+        {activeSampleBrush 
+          ? <span className="lg:hidden">Tap to add new track</span>
+          : <span className="lg:hidden">Select a sample first</span>
+        }
+        <span className="hidden lg:inline">Drag sample here to create a new track</span>
+      </p>
     </div>
   );
 };
@@ -102,8 +121,9 @@ const Studio = () => {
   } = useUIStore();
   
   const [isSaving, setIsSaving] = useState(false);
+  const [isSampleLibraryOpen, setIsSampleLibraryOpen] = useState(false);
+  const { isLoading: isPreloading, progress } = usePreloadAudio();
 
-  usePreloadAudio();
   useGlobalMouseUp();
 
   const handleLogout = async () => {
@@ -224,6 +244,10 @@ const Studio = () => {
     useTrackStore.getState().addTrackWithSample(sample);
   };
 
+  if (isPreloading) {
+    return <LoadingScreen progress={progress} />;
+  }
+
   return (
     <div className="min-h-screen bg-[#121212] font-sans text-white flex flex-col">
       <Toaster richColors />
@@ -240,27 +264,48 @@ const Studio = () => {
         onSave={handleSaveClick}
         onLoad={() => openProjectPanel('load')}
         onLogout={handleLogout}
+        onToggleSampleLibrary={() => setIsSampleLibraryOpen(!isSampleLibraryOpen)}
+        isSampleLibraryOpen={isSampleLibraryOpen}
       />
 
-      <main className="flex-1 flex flex-col p-6 gap-6 min-h-0">
-        <div className="pb-2">
+      {/* Mobile Sample Library Drawer */}
+      <MobileDrawer 
+        isOpen={isSampleLibraryOpen}
+        onClose={() => setIsSampleLibraryOpen(false)}
+        title="Sample Library"
+        side="left"
+      >
+        <SampleLibrary variant="drawer" />
+      </MobileDrawer>
+
+      <main className="flex-1 flex flex-col p-3 sm:p-4 lg:p-6 gap-3 sm:gap-4 lg:gap-6 min-h-0 overflow-hidden">
+        {/* Song Overview - más compacto en móvil */}
+        <div className="pb-1 lg:pb-2">
           <SongOverview />
         </div>
 
-        <div className="flex flex-row flex-1 gap-6 min-h-0">
-          <div className="w-80 flex-shrink-0">
+        {/* Mobile Mixer Panel - colapsable */}
+        <MobileMixerPanel />
+
+        {/* Main Content Area */}
+        <div className="flex flex-col lg:flex-row flex-1 gap-3 sm:gap-4 lg:gap-6 min-h-0">
+          {/* Desktop Sample Library - hidden on mobile */}
+          <div className="hidden lg:block w-80 flex-shrink-0 h-full">
             <SampleLibrary />
           </div>
 
-          <div className="flex-shrink-0 flex flex-col gap-2.5">
+          {/* Desktop Mixer - hidden on mobile */}
+          <div className="hidden lg:flex flex-shrink-0 flex-col gap-2.5">
             <div className="h-6" />
             <Mixer />
           </div>
 
-          <div className="flex-1 flex flex-col min-w-0">
-            <div className="relative flex-1 overflow-x-auto">
+          {/* Timeline/Tracks Area - main focus on mobile */}
+          <div className="flex-1 flex flex-col min-w-0 min-h-0">
+            {/* Scrollable timeline container */}
+            <div className="relative flex-1 overflow-x-auto overflow-y-auto touch-pan-x touch-pan-y scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
               <Playhead />
-              <div className="flex flex-col gap-2.5">
+              <div className="flex flex-col gap-2 lg:gap-2.5 min-w-max">
                 <TimelineRuler />
                 {tracks.map(track => (
                   <Track
@@ -270,7 +315,7 @@ const Studio = () => {
                     onClear={useTrackStore.getState().handleClear}
                   />
                 ))}
-                <div className="flex gap-2.5">
+                <div className="flex gap-2 lg:gap-2.5">
                   <div className="flex-1">
                     <NewTrackDropZone onDrop={handleDropOnNewTrack} />
                   </div>
@@ -279,8 +324,13 @@ const Studio = () => {
               </div>
             </div>
 
-            <div className="border-t border-[#282828] pt-4">
-              <div className="flex justify-end items-center mt-4">
+            {/* Zoom Controls Footer */}
+            <div className="border-t border-[#282828] pt-2 lg:pt-4 mt-2">
+              <div className="flex justify-between sm:justify-end items-center gap-4">
+                {/* Mobile: hint text */}
+                <p className="text-gray-500 text-xs sm:hidden">
+                  ← Desliza para ver más →
+                </p>
                 <ZoomControls onZoomIn={zoomIn} onZoomOut={zoomOut} />
               </div>
             </div>

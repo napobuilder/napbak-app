@@ -158,15 +158,15 @@ export const Track: React.FC<TrackProps> = ({
     const gridStyle = { gridTemplateColumns: `repeat(${numSlots}, ${slotWidth}px)` };
 
     return (
-        <div className="bg-[#1E1E1E] rounded-lg p-2.5 flex items-center" style={{ height: '80px' }}>
+        <div className="bg-[#1E1E1E] rounded-lg p-1.5 sm:p-2.5 flex items-center h-[60px] sm:h-[70px] lg:h-[80px] touch-manipulation">
             {/* Línea de Tiempo de Samples */}
-            <div className="grid gap-2.5 w-full h-full relative" style={gridStyle}>
+            <div className="grid gap-1.5 sm:gap-2.5 w-full h-full relative" style={gridStyle}>
                 {/* Capa de fondo para dropear */}
-                <div className="absolute inset-0 grid gap-2.5 w-full h-full" style={gridStyle}>
+                <div className="absolute inset-0 grid gap-1.5 sm:gap-2.5 w-full h-full" style={gridStyle}>
                     {dropGrid}
                 </div>
                 {/* Capa de encima con los samples */}
-                <div className="absolute inset-0 grid gap-2.5 w-full h-full pointer-events-none" style={gridStyle}>
+                <div className="absolute inset-0 grid gap-1.5 sm:gap-2.5 w-full h-full pointer-events-none" style={gridStyle}>
                     {renderedSamples.map(sampleElement => 
                         React.cloneElement(sampleElement, { 
                             ...sampleElement.props,
