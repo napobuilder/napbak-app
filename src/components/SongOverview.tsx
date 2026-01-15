@@ -2,9 +2,12 @@ import React from 'react';
 import { useTrackStore } from '../store/useTrackStore';
 import { useAudioEngine } from '../store/useAudioEngine';
 
+const BPM = 90;
+const MEASURE_DURATION = (60 / BPM) * 4; // Duración de un compás/slot en segundos
+
 export const SongOverview: React.FC = () => {
   const tracks = useTrackStore(state => state.tracks);
-  const numSlots = useTrackStore(state => state.numSlots);
+  const activeSlots = useTrackStore(state => state.activeSlots);
   const totalDuration = useTrackStore(state => state.totalDuration);
 
   const playbackTime = useAudioEngine(state => state.playbackTime);
@@ -20,6 +23,8 @@ export const SongOverview: React.FC = () => {
     seekPlayback(newTime);
   };
 
+  // Usar activeSlots en lugar de numSlots para que coincida con totalDuration
+  const numSlotsForDisplay = Math.max(1, activeSlots);
   const playheadPosition = totalDuration > 0 ? (playbackTime / totalDuration) * 100 : 0;
 
   return (
@@ -33,8 +38,9 @@ export const SongOverview: React.FC = () => {
             {track.slots.map((sample, index) => {
               if (!sample) return null;
               const duration = sample.duration || 1;
-              const left = (index / numSlots) * 100;
-              const width = (duration / numSlots) * 100;
+              // Usar activeSlots para que los bloques coincidan con el playhead
+              const left = (index / numSlotsForDisplay) * 100;
+              const width = (duration / numSlotsForDisplay) * 100;
               return (
                 <div
                   key={sample.instanceId}
@@ -52,7 +58,7 @@ export const SongOverview: React.FC = () => {
       </div>
       {/* Playhead */}
       <div 
-        className="absolute top-0 bottom-0 w-0.5 bg-white opacity-75 pointer-events-none"
+        className="absolute top-0 bottom-0 w-0.5 bg-white opacity-75 pointer-events-none z-10"
         style={{ left: `${playheadPosition}%` }}
       />
     </div>
